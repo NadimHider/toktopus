@@ -82,10 +82,11 @@ toktopus runs directly in your terminal, parsing local agent logs and system tel
 +-----------------------------------------------------------------------------+
 | [LIVE AI BENCHMARK INDEX] (Chatbot Arena / SWE-bench Verified)              |
 | Rank   Model Name           Coding ELO   SWE-bench   HumanEval   Throughput |
-| #1     Claude 3.7 Sonnet    1402         70.3%       94.8%       74 tok/s   |
-| #2     OpenAI o3-mini       1395         71.7%       95.2%       98 tok/s   |
-| #3     Gemini 2.5 Pro       1388         63.8%       94.2%       110 tok/s  |
-| >>     Gemini 3.8 Flash     1362         54.2%       91.8%       185 tok/s  |
+| #1     GPT 6.1              1540         84.6%       98.4%       115 tok/s  |
+| #2     Claude 5.5           1535         83.9%       98.1%       95 tok/s   |
+| #3     DeepSeek R4.1 Flash  1495         78.4%       96.5%       240 tok/s  |
+| #4     Gemini 3.8 Flash     1480         76.2%       95.8%       185 tok/s  |
+| #5     Claude 3.7 Sonnet    1402         70.3%       94.8%       74 tok/s   |
 +-----------------------------------------------------------------------------+
 | [SUB-AGENTS & SKILLS VAULT]           | [REAL-TIME AGENT STEP TRANSCRIPT]   |
 | * research            [ACTIVE]        | #111 [PLANNER_RESPONSE] 83,200 tok  |
@@ -210,7 +211,7 @@ toktopus includes calibrated benchmark records tracking:
 * **HumanEval**: Python functional correctness benchmark.
 * **Throughput**: Generation speed measured in tokens per second.
 
-Models tracked include Claude 3.7 Sonnet, OpenAI o3-mini, Gemini 2.5 Pro, GPT-4.5 Preview, DeepSeek-R1, Gemini 3.8 Flash, OpenAI o1, Claude 3.5 Sonnet v2, DeepSeek-V3, Qwen 2.5 Coder 32B, and GPT-4o.
+Models tracked include GPT 6.1, Claude 5.5, DeepSeek R4.1 Flash, Gemini 3.8 Flash, Claude 3.7 Sonnet, OpenAI o3-mini, Gemini 2.5 Pro, DeepSeek-R1, and Qwen 2.5 Coder 32B.
 
 ---
 
