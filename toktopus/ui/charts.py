@@ -82,7 +82,7 @@ def mini_cpu_gauge(percent: float, width: int = 12) -> str:
 
     return f"[{color}]{'█' * filled}[/{color}][dim]{'░' * empty}[/dim]"
 
-def relative_benchmark_bar(score: float, max_score: float = 1400.0, width: int = 12) -> str:
+def relative_benchmark_bar(score: float, max_score: float = 1600.0, width: int = 12) -> str:
     pct = min(1.0, max(0.0, score / max_score))
     filled = int(pct * width)
     empty = width - filled

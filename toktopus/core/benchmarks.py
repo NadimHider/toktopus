@@ -2,8 +2,55 @@ import json
 import urllib.request
 from typing import List, Dict, Any, Optional
 
-# Benchmark data matrix calibrated against latest Chatbot Arena Coding ELO and SWE-bench Verified
 BENCHMARK_MATRIX: List[Dict[str, Any]] = [
+    {
+        "id": "gpt-6-1",
+        "name": "GPT 6.1",
+        "provider": "OpenAI",
+        "coding_elo": 1540,
+        "swe_bench": 84.6,
+        "humaneval": 98.4,
+        "throughput_tps": 115,
+        "price_in": 2.00,
+        "price_out": 8.00,
+        "rank": 1
+    },
+    {
+        "id": "claude-5-5",
+        "name": "Claude 5.5",
+        "provider": "Anthropic",
+        "coding_elo": 1535,
+        "swe_bench": 83.9,
+        "humaneval": 98.1,
+        "throughput_tps": 95,
+        "price_in": 2.50,
+        "price_out": 10.00,
+        "rank": 2
+    },
+    {
+        "id": "deepseek-r4-1-flash",
+        "name": "DeepSeek R4.1 Flash",
+        "provider": "DeepSeek",
+        "coding_elo": 1495,
+        "swe_bench": 78.4,
+        "humaneval": 96.5,
+        "throughput_tps": 240,
+        "price_in": 0.08,
+        "price_out": 0.32,
+        "rank": 3
+    },
+    {
+        "id": "gemini-3-8-flash",
+        "name": "Gemini 3.8 Flash",
+        "provider": "Google DeepMind",
+        "coding_elo": 1480,
+        "swe_bench": 76.2,
+        "humaneval": 95.8,
+        "throughput_tps": 185,
+        "price_in": 0.10,
+        "price_out": 0.40,
+        "rank": 4
+    },
     {
         "id": "claude-3-7-sonnet",
         "name": "Claude 3.7 Sonnet",
@@ -14,7 +61,7 @@ BENCHMARK_MATRIX: List[Dict[str, Any]] = [
         "throughput_tps": 74,
         "price_in": 3.00,
         "price_out": 15.00,
-        "rank": 1
+        "rank": 5
     },
     {
         "id": "o3-mini",
@@ -26,7 +73,7 @@ BENCHMARK_MATRIX: List[Dict[str, Any]] = [
         "throughput_tps": 98,
         "price_in": 1.10,
         "price_out": 4.40,
-        "rank": 2
+        "rank": 6
     },
     {
         "id": "gemini-2-5-pro",
@@ -38,19 +85,7 @@ BENCHMARK_MATRIX: List[Dict[str, Any]] = [
         "throughput_tps": 110,
         "price_in": 1.25,
         "price_out": 5.00,
-        "rank": 3
-    },
-    {
-        "id": "gpt-4-5",
-        "name": "GPT-4.5 Preview",
-        "provider": "OpenAI",
-        "coding_elo": 1378,
-        "swe_bench": 62.5,
-        "humaneval": 92.0,
-        "throughput_tps": 55,
-        "price_in": 75.00,
-        "price_out": 150.00,
-        "rank": 4
+        "rank": 7
     },
     {
         "id": "deepseek-r1",
@@ -62,55 +97,7 @@ BENCHMARK_MATRIX: List[Dict[str, Any]] = [
         "throughput_tps": 38,
         "price_in": 0.55,
         "price_out": 2.19,
-        "rank": 5
-    },
-    {
-        "id": "gemini-3-8-flash",
-        "name": "Gemini 3.8 Flash",
-        "provider": "Google DeepMind",
-        "coding_elo": 1362,
-        "swe_bench": 54.2,
-        "humaneval": 91.8,
-        "throughput_tps": 185,
-        "price_in": 0.10,
-        "price_out": 0.40,
-        "rank": 6
-    },
-    {
-        "id": "o1",
-        "name": "OpenAI o1",
-        "provider": "OpenAI",
-        "coding_elo": 1360,
-        "swe_bench": 53.2,
-        "humaneval": 93.4,
-        "throughput_tps": 42,
-        "price_in": 15.00,
-        "price_out": 60.00,
-        "rank": 7
-    },
-    {
-        "id": "claude-3-5-sonnet",
-        "name": "Claude 3.5 Sonnet v2",
-        "provider": "Anthropic",
-        "coding_elo": 1354,
-        "swe_bench": 53.7,
-        "humaneval": 93.7,
-        "throughput_tps": 82,
-        "price_in": 3.00,
-        "price_out": 15.00,
         "rank": 8
-    },
-    {
-        "id": "deepseek-v3",
-        "name": "DeepSeek-V3",
-        "provider": "DeepSeek",
-        "coding_elo": 1342,
-        "swe_bench": 49.2,
-        "humaneval": 89.6,
-        "throughput_tps": 68,
-        "price_in": 0.14,
-        "price_out": 0.28,
-        "rank": 9
     },
     {
         "id": "qwen-2-5-coder-32b",
@@ -122,19 +109,7 @@ BENCHMARK_MATRIX: List[Dict[str, Any]] = [
         "throughput_tps": 88,
         "price_in": 0.20,
         "price_out": 0.20,
-        "rank": 10
-    },
-    {
-        "id": "gpt-4o",
-        "name": "GPT-4o",
-        "provider": "OpenAI",
-        "coding_elo": 1332,
-        "swe_bench": 53.8,
-        "humaneval": 90.2,
-        "throughput_tps": 108,
-        "price_in": 2.50,
-        "price_out": 10.00,
-        "rank": 11
+        "rank": 9
     }
 ]
 
@@ -155,7 +130,7 @@ def find_model_benchmark(model_id_or_name: str) -> Dict[str, Any]:
 
 def refresh_benchmarks_online(timeout_sec: float = 2.0) -> bool:
     global _LIVE_CACHE
-    url = "https://raw.githubusercontent.com/nadimhider/toktopus/main/data/benchmarks.json"
+    url = "https://raw.githubusercontent.com/NadimHider/toktopus/main/data/benchmarks.json"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "toktopus-monitor"})
         with urllib.request.urlopen(req, timeout=timeout_sec) as resp:

@@ -9,13 +9,29 @@ PRICING_TABLE: Dict[str, Dict[str, Any]] = {
         "cache_read": 0.025,
         "context_window": 1_000_000
     },
-    "gemini-2-5-pro": {
-        "name": "Gemini 2.5 Pro",
-        "provider": "Google DeepMind",
-        "input": 1.25,
-        "output": 5.00,
-        "cache_read": 0.3125,
-        "context_window": 2_000_000
+    "gpt-6-1": {
+        "name": "GPT 6.1",
+        "provider": "OpenAI",
+        "input": 2.00,
+        "output": 8.00,
+        "cache_read": 0.50,
+        "context_window": 500_000
+    },
+    "claude-5-5": {
+        "name": "Claude 5.5",
+        "provider": "Anthropic",
+        "input": 2.50,
+        "output": 10.00,
+        "cache_read": 0.30,
+        "context_window": 500_000
+    },
+    "deepseek-r4-1-flash": {
+        "name": "DeepSeek R4.1 Flash",
+        "provider": "DeepSeek",
+        "input": 0.08,
+        "output": 0.32,
+        "cache_read": 0.015,
+        "context_window": 256_000
     },
     "claude-3-7-sonnet": {
         "name": "Claude 3.7 Sonnet",
@@ -25,13 +41,13 @@ PRICING_TABLE: Dict[str, Dict[str, Any]] = {
         "cache_read": 0.30,
         "context_window": 200_000
     },
-    "claude-3-5-sonnet": {
-        "name": "Claude 3.5 Sonnet v2",
-        "provider": "Anthropic",
-        "input": 3.00,
-        "output": 15.00,
-        "cache_read": 0.30,
-        "context_window": 200_000
+    "gemini-2-5-pro": {
+        "name": "Gemini 2.5 Pro",
+        "provider": "Google DeepMind",
+        "input": 1.25,
+        "output": 5.00,
+        "cache_read": 0.3125,
+        "context_window": 2_000_000
     },
     "o3-mini": {
         "name": "OpenAI o3-mini",
@@ -39,14 +55,6 @@ PRICING_TABLE: Dict[str, Dict[str, Any]] = {
         "input": 1.10,
         "output": 4.40,
         "cache_read": 0.55,
-        "context_window": 200_000
-    },
-    "o1": {
-        "name": "OpenAI o1",
-        "provider": "OpenAI",
-        "input": 15.00,
-        "output": 60.00,
-        "cache_read": 7.50,
         "context_window": 200_000
     },
     "deepseek-r1": {
@@ -57,36 +65,12 @@ PRICING_TABLE: Dict[str, Dict[str, Any]] = {
         "cache_read": 0.14,
         "context_window": 128_000
     },
-    "deepseek-v3": {
-        "name": "DeepSeek-V3",
-        "provider": "DeepSeek",
-        "input": 0.14,
-        "output": 0.28,
-        "cache_read": 0.014,
-        "context_window": 128_000
-    },
     "qwen-2-5-coder-32b": {
         "name": "Qwen 2.5 Coder 32B",
         "provider": "Alibaba Cloud",
         "input": 0.20,
         "output": 0.20,
         "cache_read": 0.05,
-        "context_window": 128_000
-    },
-    "gpt-4o": {
-        "name": "GPT-4o",
-        "provider": "OpenAI",
-        "input": 2.50,
-        "output": 10.00,
-        "cache_read": 1.25,
-        "context_window": 128_000
-    },
-    "gpt-4-5": {
-        "name": "GPT-4.5 Preview",
-        "provider": "OpenAI",
-        "input": 75.00,
-        "output": 150.00,
-        "cache_read": 37.50,
         "context_window": 128_000
     }
 }
