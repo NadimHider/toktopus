@@ -13,6 +13,7 @@ AI_PROCESS_NAMES = {
 _CACHED_PROCESSES: List[Dict[str, Any]] = []
 _LAST_SCAN_TIME: float = 0.0
 _SCAN_INTERVAL: float = 3.0
+_INITIALIZED: bool = False
 
 def _scan_ai_processes() -> List[Dict[str, Any]]:
     # Windows process queries are throttled here because calling cmdline across
@@ -63,12 +64,13 @@ def _scan_ai_processes() -> List[Dict[str, Any]]:
     return found_processes
 
 def get_system_telemetry() -> Dict[str, Any]:
-    global _CACHED_PROCESSES, _LAST_SCAN_TIME
+    global _CACHED_PROCESSES, _LAST_SCAN_TIME, _INITIALIZED
 
     now = time.time()
-    if (now - _LAST_SCAN_TIME) >= _SCAN_INTERVAL or not _CACHED_PROCESSES:
+    if not _INITIALIZED or (now - _LAST_SCAN_TIME) >= _SCAN_INTERVAL:
         _CACHED_PROCESSES = _scan_ai_processes()
         _LAST_SCAN_TIME = now
+        _INITIALIZED = True
 
     cpu_percent = psutil.cpu_percent(interval=None)
     mem = psutil.virtual_memory()

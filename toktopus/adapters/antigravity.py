@@ -17,6 +17,7 @@ POSSIBLE_AG_DIRS = [
 class AntigravityAdapter(BaseAgentAdapter):
     def __init__(self):
         self.ag_dir = self._find_ag_dir()
+        self._active_conv_id: Optional[str] = None
         self._cached_session_id: Optional[str] = None
         self._last_session_check: float = 0.0
         self._cached_telemetry: Optional[Dict[str, Any]] = None
@@ -77,10 +78,17 @@ class AntigravityAdapter(BaseAgentAdapter):
         self._total_output = 0
         self._total_cache = 0
         self._current_context_tokens = 0
+        self._last_file_mtime = 0.0
+        self._last_file_size = 0
         self._last_read_pos = 0
 
     def get_session_telemetry(self, session_id: Optional[str] = None) -> Dict[str, Any]:
         conv_id = session_id or self.get_active_session_id() or "default"
+        if conv_id != self._active_conv_id:
+            self._reset_cache()
+            self._cached_telemetry = None
+            self._active_conv_id = conv_id
+
         brain_dir = self.ag_dir / "brain"
         log_dir = brain_dir / conv_id / ".system_generated" / "logs"
 

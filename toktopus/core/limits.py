@@ -108,10 +108,10 @@ AGENT_PLAN_CYCLE: Dict[str, List[str]] = {
 
 def normalize_plan_key(raw_key: str, agent_key: str = "antigravity") -> str:
     cleaned = (raw_key or "").strip().lower()
-    if cleaned in PLAN_ALIASES:
-        return PLAN_ALIASES[cleaned]
-    if cleaned in TIER_LIMITS:
-        return cleaned
+    resolved = PLAN_ALIASES.get(cleaned, cleaned)
+    valid_cycle = AGENT_PLAN_CYCLE.get(agent_key, list(TIER_LIMITS.keys()))
+    if resolved in valid_cycle:
+        return resolved
 
     fallback_map = {
         "antigravity": "google-ai-pro",
