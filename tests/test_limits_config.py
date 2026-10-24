@@ -1,0 +1,62 @@
+import unittest
+import tempfile
+import json
+from pathlib import Path
+
+from toktopus.core.limits import (
+    TIER_LIMITS,
+    normalize_plan_key,
+    get_next_plan,
+    estimate_account_limits
+)
+from toktopus.core.config import load_config, save_config, get_default_plan_for_agent
+
+class TestLimitsAndConfig(unittest.TestCase):
+    def test_google_ai_pro_plan_registered(self):
+        self.assertIn("google-ai-pro", TIER_LIMITS)
+        pro = TIER_LIMITS["google-ai-pro"]
+        self.assertEqual(pro["tier_name"], "Google AI Pro Plan")
+        self.assertEqual(pro["max_context"], 2_000_000)
+        self.assertEqual(pro["max_tpm"], 4_000_000)
+        self.assertEqual(pro["max_rpm"], 360)
+        self.assertTrue(pro["is_subscription"])
+
+    def test_plan_aliases(self):
+        self.assertEqual(normalize_plan_key("pro"), "google-ai-pro")
+        self.assertEqual(normalize_plan_key("gemini-pro"), "google-ai-pro")
+        self.assertEqual(normalize_plan_key("payg"), "gemini-payg")
+        self.assertEqual(normalize_plan_key("free"), "gemini-free")
+        self.assertEqual(normalize_plan_key("claude"), "claude-pro")
+        self.assertEqual(normalize_plan_key("opencode"), "opencode-zen")
+        self.assertEqual(normalize_plan_key("cursor"), "cursor-pro")
+
+    def test_estimate_limits_google_ai_pro(self):
+        res = estimate_account_limits(
+            agent_key="antigravity",
+            recent_tokens=50_000,
+            recent_requests=2,
+            tier_override="google-ai-pro"
+        )
+        self.assertEqual(res["tier_name"], "Google AI Pro Plan")
+        self.assertEqual(res["plan_badge"], "[PRO PLAN]")
+        self.assertEqual(res["max_context"], 2_000_000)
+        self.assertEqual(res["max_tpm"], 4_000_000)
+        self.assertEqual(res["status"], "SAFE")
+        self.assertGreater(res["tpm_remaining"], 3_900_000)
+
+    def test_plan_cycling(self):
+        nxt = get_next_plan("google-ai-pro", "antigravity")
+        self.assertEqual(nxt, "gemini-payg")
+        nxt2 = get_next_plan("gemini-payg", "antigravity")
+        self.assertEqual(nxt2, "gemini-free")
+        nxt3 = get_next_plan("gemini-free", "antigravity")
+        self.assertEqual(nxt3, "google-ai-pro")
+
+    def test_agent_default_plans(self):
+        self.assertEqual(get_default_plan_for_agent("antigravity"), "google-ai-pro")
+        self.assertEqual(get_default_plan_for_agent("claude"), "claude-pro")
+        self.assertEqual(get_default_plan_for_agent("opencode"), "opencode-zen")
+        self.assertEqual(get_default_plan_for_agent("cursor"), "cursor-pro")
+
+if __name__ == "__main__":
+    unittest.main()

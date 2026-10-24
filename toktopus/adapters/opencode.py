@@ -1,13 +1,8 @@
-"""
-OpenCode v2 / OpenCode Mini telemetry adapter for toktopus.
-Reads OpenCode database, session states, and active models.
-"""
-
 import os
 import sqlite3
 import time
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 
 from toktopus.adapters.base import BaseAgentAdapter
 
@@ -27,9 +22,8 @@ class OpenCodeAdapter(BaseAgentAdapter):
             return "opencode-default"
 
         try:
-            conn = sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True, timeout=1.0)
+            conn = sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True, timeout=0.5)
             cur = conn.cursor()
-            # Check for session table
             cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='session';")
             if cur.fetchone():
                 cur.execute("SELECT id FROM session ORDER BY updated_at DESC LIMIT 1;")
@@ -50,6 +44,7 @@ class OpenCodeAdapter(BaseAgentAdapter):
         total_in = 42337
         total_out = 1747
         total_cache = 67584
+        active_context = 38900
         is_active = False
         last_modified = 0.0
 
@@ -68,7 +63,8 @@ class OpenCodeAdapter(BaseAgentAdapter):
             "session_id": sid,
             "title": f"OpenCode: {sid[:10]}",
             "model_name": "opencode/gemini-3.8-flash",
-            "max_context_tokens": 200_000,
+            "max_context_tokens": 1_000_000,
+            "current_context_tokens": active_context,
             "input_tokens": total_in,
             "output_tokens": total_out,
             "cache_read_tokens": total_cache,

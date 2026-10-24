@@ -3,6 +3,7 @@ README.md
 pyproject.toml
 tests/test_adapters.py
 tests/test_charts.py
+tests/test_limits_config.py
 tests/test_pricing.py
 tests/test_system.py
 toktopus/__init__.py
@@ -21,6 +22,7 @@ toktopus/adapters/cursor.py
 toktopus/adapters/opencode.py
 toktopus/core/__init__.py
 toktopus/core/benchmarks.py
+toktopus/core/config.py
 toktopus/core/keyboard.py
 toktopus/core/limits.py
 toktopus/core/pricing.py

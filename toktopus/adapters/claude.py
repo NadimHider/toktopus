@@ -1,14 +1,8 @@
-"""
-Claude Code telemetry adapter for toktopus.
-Reads Claude sessions, config, and token metrics.
-"""
-
 import os
-import glob
 import json
 import time
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 
 from toktopus.adapters.base import BaseAgentAdapter
 
@@ -37,9 +31,9 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
         total_in = 0
         total_out = 0
         total_cache = 0
+        active_context = 0
         is_active = False
         last_modified = 0.0
-        steps = []
         step_burns = []
 
         if sess_file.exists():
@@ -51,14 +45,15 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
                     total_in = data.get("input_tokens", 0)
                     total_out = data.get("output_tokens", 0)
                     total_cache = data.get("cache_read_tokens", 0)
+                    active_context = data.get("current_context_tokens", total_in + total_cache)
             except Exception:
                 pass
 
         if total_in == 0 and total_out == 0:
-            # Baseline simulation / ready state if idle
             total_in = 18450
             total_out = 2340
             total_cache = 45200
+            active_context = 31200
             step_burns = [1200, 2400, 1850, 3100, 4200, 2900]
 
         denom = total_in + total_cache
@@ -70,6 +65,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
             "title": f"Claude: {sid[:12]}",
             "model_name": "Claude 3.7 Sonnet (Hybrid)",
             "max_context_tokens": 200_000,
+            "current_context_tokens": active_context,
             "input_tokens": total_in,
             "output_tokens": total_out,
             "cache_read_tokens": total_cache,

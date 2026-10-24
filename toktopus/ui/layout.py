@@ -21,6 +21,7 @@ def build_dashboard(
     sys_metrics: Dict[str, Any],
     active_agent_key: str,
     pricing_model_key: str,
+    plan_tier_key: str = "google-ai-pro",
     show_full_benchmarks: bool = False
 ) -> Layout:
     layout = Layout()
@@ -37,14 +38,14 @@ def build_dashboard(
     agent_name = telemetry.get("agent_name", "AI Agent")
     session_id = telemetry.get("session_id", "default")
     is_active = telemetry.get("is_active", False)
-    status_icon = "🟢 ACTIVE" if is_active else "⚪ IDLE"
+    status_pill = "[ACTIVE]" if is_active else "[IDLE]"
 
     header_text = Text()
-    header_text.append("🐙 toktopus v1.0.0 ", style="bold #00f3ff")
+    header_text.append(":: TOKTOPUS v1.1.0 ", style="bold #00f3ff")
     header_text.append(":: Universal AI Agent Monitor ", style="bold white")
     header_text.append(f" [Agent: {agent_name}] ", style="bold #00ff88")
     header_text.append(f" [Session: {session_id[:12]}] ", style="#b026ff")
-    header_text.append(f" [{status_icon}]", style="bold #ffe600" if is_active else "dim")
+    header_text.append(f" {status_pill}", style="bold #00ff88" if is_active else "dim")
 
     layout["header"].update(Panel(header_text, style="#00f3ff", border_style="#00f3ff"))
 
@@ -53,42 +54,60 @@ def build_dashboard(
         Layout(name="velocity_box", ratio=1)
     )
 
+    # Active turn context tokens loaded in the window
+    current_ctx = telemetry.get("current_context_tokens", 0)
+    max_ctx = telemetry.get("max_context_tokens", 2_000_000)
+
+    # Lifetime session token volume
     in_tok = telemetry.get("input_tokens", 0)
     out_tok = telemetry.get("output_tokens", 0)
     cache_tok = telemetry.get("cache_read_tokens", 0)
-    max_ctx = telemetry.get("max_context_tokens", 200_000)
-    used_ctx = in_tok + out_tok + cache_tok
+    total_sess_tok = telemetry.get("total_tokens", in_tok + out_tok + cache_tok)
     cache_eff = telemetry.get("cache_efficiency", 0.0)
     model_name = telemetry.get("model_name", "Gemini 3.8 Flash")
 
     costs = calculate_costs(in_tok, out_tok, cache_tok, pricing_model_key)
-    limits = estimate_account_limits(active_agent_key, recent_tokens=in_tok + out_tok)
+    limits = estimate_account_limits(
+        active_agent_key,
+        recent_tokens=current_ctx if current_ctx > 0 else (in_tok + out_tok),
+        tier_override=plan_tier_key
+    )
+
+    if limits["max_context"] > 0:
+        max_ctx = limits["max_context"]
 
     context_table = Table.grid(padding=(0, 1))
-    context_table.add_row("[bold white]Model:[/bold white]", f"[#00f3ff]{model_name}[/#00f3ff]")
     context_table.add_row(
-        "[bold white]Context:[/bold white]",
-        f"{context_gauge(used_ctx, max_ctx)} [dim]({used_ctx:,} / {max_ctx:,})[/dim]"
+        "[bold white]Model & Plan:[/bold white]",
+        f"[#00f3ff]{model_name}[/#00f3ff]  [bold #00ff88]{limits['tier_name']}[/bold #00ff88] [dim]{limits['plan_badge']}[/dim]"
     )
     context_table.add_row(
-        "[bold white]Account Quota:[/bold white]",
-        f"{quota_gauge(limits['tpm_used'], limits['max_tpm'])} [dim]({limits['tier_name']})[/dim]"
+        "[bold white]Active Context:[/bold white]",
+        f"{context_gauge(current_ctx, max_ctx)} [dim]({current_ctx:,} / {max_ctx:,})[/dim]"
+    )
+
+    status_color = "#00ff88" if limits["status"] == "SAFE" else ("#ffe600" if limits["status"] == "WARN" else "#ff3366")
+    context_table.add_row(
+        "[bold white]Minute Limit (TPM):[/bold white]",
+        f"{quota_gauge(limits['tpm_used'], limits['max_tpm'])} [{status_color}][{limits['status']}][/{status_color}] [dim](Rem: {limits['tpm_remaining']:,})[/dim]"
+    )
+    context_table.add_row(
+        "[bold white]Request Rate (RPM):[/bold white]",
+        f"{quota_gauge(limits['rpm_used'], limits['max_rpm'], width=12)} [dim]({limits['rpm_used']} / {limits['max_rpm']} rpm)[/dim]"
     )
     context_table.add_row(
         "[bold white]Cache Ratio:[/bold white]",
         f"[#00ff88]{cache_eff:.1f}% [OPTIMAL][/#00ff88]" if cache_eff > 50 else f"[#ffe600]{cache_eff:.1f}%[/#ffe600]"
     )
+
+    cost_note = " (Included in Pro Plan)" if limits.get("is_subscription") else ""
     context_table.add_row(
-        "[bold white]Composition:[/bold white]",
-        f"[{stacked_token_ratio_bar(cache_tok, in_tok, out_tok)}] [dim]C/In/Out[/dim]"
-    )
-    context_table.add_row(
-        "[bold white]Cost / Saved:[/bold white]",
-        f"[#ffe600]${costs['cost_spent_usd']:.4f}[/#ffe600] spent  |  [#00ff88]${costs['cost_saved_usd']:.4f}[/#00ff88] saved 💰"
+        "[bold white]Session Billing:[/bold white]",
+        f"[#ffe600]${costs['cost_spent_usd']:.4f}[/#ffe600] value  |  [#00ff88]${costs['cost_saved_usd']:.4f}[/#00ff88] saved{cost_note}"
     )
 
     layout["top_row"]["context_box"].update(
-        Panel(context_table, title="[bold #00f3ff]🧠 CONTEXT WINDOW & ACCOUNT LIMITS[/bold #00f3ff]", border_style="#00f3ff")
+        Panel(context_table, title="[bold #00f3ff][CONTEXT WINDOW & ACCOUNT LIMITS][/bold #00f3ff]", border_style="#00f3ff")
     )
 
     step_burns = telemetry.get("recent_steps_tokens", [0])
@@ -97,9 +116,18 @@ def build_dashboard(
     sparkline_str = braille_sparkline(step_burns, max_width=26)
 
     velocity_table = Table.grid(padding=(0, 1))
-    velocity_table.add_row("[bold white]Input Tokens:[/bold white]", f"[#00f3ff]{in_tok:,}[/#00f3ff] [dim]fresh billed[/dim]")
-    velocity_table.add_row("[bold white]Output Tokens:[/bold white]", f"[#b026ff]{out_tok:,}[/#b026ff] [dim]agent generation[/dim]")
-    velocity_table.add_row("[bold white]Cached Read:[/bold white]", f"[#00ff88]{cache_tok:,}[/#00ff88] [dim]reused context[/dim]")
+    velocity_table.add_row(
+        "[bold white]Session Volume:[/bold white]",
+        f"[bold white]{total_sess_tok:,}[/bold white] [dim]cumulative tokens[/dim]"
+    )
+    velocity_table.add_row(
+        "[bold white]Composition:[/bold white]",
+        f"[{stacked_token_ratio_bar(cache_tok, in_tok, out_tok)}] [dim]Cached / Fresh In / Gen Out[/dim]"
+    )
+    velocity_table.add_row(
+        "[bold white]Breakdown:[/bold white]",
+        f"[#00ff88]C: {cache_tok:,}[/#00ff88]  [#00f3ff]In: {in_tok:,}[/#00f3ff]  [#b026ff]Out: {out_tok:,}[/#b026ff]"
+    )
     velocity_table.add_row(
         "[bold white]Velocity / Rate:[/bold white]",
         f"[#ffe600]{avg_per_step:,}[/#ffe600] tok/step  |  [#00ff88]{tok_per_sec}[/#00ff88] tok/s"
@@ -110,7 +138,7 @@ def build_dashboard(
     )
 
     layout["top_row"]["velocity_box"].update(
-        Panel(velocity_table, title="[bold #b026ff]⚡ TOKEN VELOCITY & STEP BURNS[/bold #b026ff]", border_style="#b026ff")
+        Panel(velocity_table, title="[bold #b026ff][TOKEN VELOCITY & STEP BURNS][/bold #b026ff]", border_style="#b026ff")
     )
 
     bench_table = Table(box=None, expand=True, pad_edge=False)
@@ -127,7 +155,7 @@ def build_dashboard(
 
     for b in display_bench:
         is_cur = (model_name.lower() in b["name"].lower()) or (b["name"].lower() in model_name.lower())
-        prefix = "▶ " if is_cur else "  "
+        prefix = ">> " if is_cur else "   "
         name_style = "bold #00ff88" if is_cur else "white"
 
         bench_table.add_row(
@@ -144,7 +172,7 @@ def build_dashboard(
     layout["benchmarks"].update(
         Panel(
             bench_table,
-            title="[bold #ffe600]🏆 LIVE AI BENCHMARK INDEX (Chatbot Arena / SWE-bench / Artificial Analysis)[/bold #ffe600]",
+            title="[bold #ffe600][LIVE AI BENCHMARK INDEX] (Chatbot Arena / SWE-bench / Artificial Analysis)[/bold #ffe600]",
             border_style="#ffe600"
         )
     )
@@ -158,11 +186,11 @@ def build_dashboard(
     sub_table = Table.grid(padding=(0, 1))
     for ag in subagents[:4]:
         status_color = "#00ff88" if ag["status"] == "ACTIVE" else "dim"
-        sub_table.add_row(f"[white]• {ag['name']}[/white]", f"[{status_color}][{ag['status']}][/{status_color}]")
+        sub_table.add_row(f"[white]* {ag['name']}[/white]", f"[{status_color}][{ag['status']}][/{status_color}]")
     sub_table.add_row("[dim]Installed Skills:[/dim] [bold #00f3ff]374[/bold #00f3ff]", "[dim]Plugins:[/dim] [bold #b026ff]93[/bold #b026ff]")
 
     layout["middle_row"]["subagents_box"].update(
-        Panel(sub_table, title="[bold #00ff88]🛠️ SUB-AGENTS & SKILLS VAULT[/bold #00ff88]", border_style="#00ff88")
+        Panel(sub_table, title="[bold #00ff88][SUB-AGENTS & SKILLS VAULT][/bold #00ff88]", border_style="#00ff88")
     )
 
     recent_steps = telemetry.get("recent_steps", [])
@@ -177,7 +205,7 @@ def build_dashboard(
         )
 
     layout["middle_row"]["transcript_box"].update(
-        Panel(step_table, title="[bold white]📜 REAL-TIME AGENT STEP TRANSCRIPT[/bold white]", border_style="dim")
+        Panel(step_table, title="[bold white][REAL-TIME AGENT STEP TRANSCRIPT][/bold white]", border_style="dim")
     )
 
     host_cpu = sys_metrics.get("host_cpu_percent", 0.0)
@@ -200,7 +228,7 @@ def build_dashboard(
         sys_text.append("No background AI agent processes currently active.", style="dim")
 
     layout["system_row"].update(
-        Panel(sys_text, title="[bold #00f3ff]💻 SYSTEM LOAD & AI AGENT PROCESS TELEMETRY[/bold #00f3ff]", border_style="#00f3ff")
+        Panel(sys_text, title="[bold #00f3ff][SYSTEM LOAD & PROCESS TELEMETRY][/bold #00f3ff]", border_style="#00f3ff")
     )
 
     footer_text = Text()
@@ -208,7 +236,7 @@ def build_dashboard(
     footer_text.append(" [2] Claude Code ", style="bold #00ff88" if active_agent_key == "claude" else "dim")
     footer_text.append(" [3] OpenCode ", style="bold #00ff88" if active_agent_key == "opencode" else "dim")
     footer_text.append(" [4] Cursor ", style="bold #00ff88" if active_agent_key == "cursor" else "dim")
-    footer_text.append(" | [M] Cycle Pricing  [B] Toggle Benchmarks  [R] Refresh  [Q] Quit", style="bold white")
+    footer_text.append(f" | [P] Plan: {limits['tier_name']}  [M] Pricing Model  [B] Benchmarks  [R] Refresh  [Q] Quit", style="bold white")
 
     layout["footer"].update(Panel(footer_text, border_style="dim"))
 

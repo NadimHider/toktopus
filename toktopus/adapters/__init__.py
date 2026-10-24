@@ -1,8 +1,5 @@
-"""
-Adapter Registry and Auto-Detector for toktopus.
-"""
-
-from typing import Dict, List, Optional
+from pathlib import Path
+from typing import Dict
 from toktopus.adapters.base import BaseAgentAdapter
 from toktopus.adapters.antigravity import AntigravityAdapter
 from toktopus.adapters.claude import ClaudeCodeAdapter
@@ -24,23 +21,26 @@ KEY_MAP = {
 }
 
 def get_adapter(name: str) -> BaseAgentAdapter:
-    """Retrieve adapter by name or fallback to antigravity."""
     return ADAPTERS.get(name.lower(), ADAPTERS["antigravity"])
 
 def auto_detect_active_agent() -> str:
-    """Automatically detect whichever agent has the most recent activity."""
-    newest_agent = "antigravity"
-    newest_mtime = 0.0
+    # Quick disk check without heavy payload parsing
+    home = Path.home()
+    
+    ag_path = home / ".gemini" / "antigravity-cli" / "brain"
+    if ag_path.exists():
+        return "antigravity"
 
-    for key, adapter in ADAPTERS.items():
-        if adapter.is_detected():
-            try:
-                telemetry = adapter.get_session_telemetry()
-                mtime = telemetry.get("last_modified", 0.0)
-                if mtime > newest_mtime:
-                    newest_mtime = mtime
-                    newest_agent = key
-            except Exception:
-                continue
+    claude_path = home / ".claude" / "sessions"
+    if claude_path.exists():
+        return "claude"
 
-    return newest_agent
+    opencode_path = home / ".local" / "share" / "opencode"
+    if opencode_path.exists():
+        return "opencode"
+
+    cursor_path = home / ".cursor"
+    if cursor_path.exists():
+        return "cursor"
+
+    return "antigravity"

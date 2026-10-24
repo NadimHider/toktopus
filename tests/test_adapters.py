@@ -10,14 +10,15 @@ class TestAdapters(unittest.TestCase):
             telemetry = adapter.get_session_telemetry()
             self.assertIn("agent_name", telemetry)
             self.assertIn("total_tokens", telemetry)
+            self.assertIn("current_context_tokens", telemetry)
             self.assertIn("cache_efficiency", telemetry)
 
     def test_antigravity_detection(self):
         ag = get_adapter("antigravity")
-        # On this machine, .gemini/antigravity-cli or .gemini/antigravity exists
         self.assertTrue(ag.is_detected())
         t = ag.get_session_telemetry()
         self.assertGreaterEqual(t["max_context_tokens"], 128_000)
+        self.assertIn("current_context_tokens", t)
 
 if __name__ == "__main__":
     unittest.main()

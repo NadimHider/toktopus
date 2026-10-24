@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "toktopus"
-version = "1.0.0"
-description = "Universal btop-style Terminal Monitor for AI Coding Agents (Antigravity, Claude Code, OpenCode, Cursor)"
+version = "1.1.0"
+description = "Universal Terminal Monitor for AI Coding Agents (Antigravity, Claude Code, OpenCode, Cursor)"
 readme = "README.md"
 authors = [{ name = "Nadim Hider" }]
 license = { text = "MIT" }
