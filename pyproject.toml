@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "toktopus"
+version = "1.0.0"
+description = "Universal btop-style Terminal Monitor for AI Coding Agents (Antigravity, Claude Code, OpenCode, Cursor)"
+readme = "README.md"
+authors = [{ name = "Nadim Hider" }]
+license = { text = "MIT" }
+requires-python = ">=3.9"
+dependencies = [
+    "rich>=13.0.0",
+    "psutil>=5.9.0"
+]
+keywords = [
+    "tui",
+    "btop",
+    "terminal",
+    "ai-agent",
+    "tokens",
+    "antigravity",
+    "claude-code",
+    "opencode",
+    "cursor",
+    "monitoring",
+    "benchmarks"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Monitoring",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence"
+]
+
+[project.scripts]
+toktopus = "toktopus.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/nadimhider/toktopus"
+Repository = "https://github.com/nadimhider/toktopus"
+Issues = "https://github.com/nadimhider/toktopus/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["toktopus*"]

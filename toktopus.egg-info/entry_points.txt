@@ -1,0 +1,2 @@
+[console_scripts]
+toktopus = toktopus.cli:main
