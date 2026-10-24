@@ -1,10 +1,6 @@
-"""
-btop-inspired Truecolor Theme Palettes for toktopus.
-"""
-
 from rich.theme import Theme
 
-# Hex colors matching btop truecolor neon aesthetic
+# Truecolor palette for terminal rendering
 CYAN = "#00f3ff"
 PURPLE = "#b026ff"
 EMERALD = "#00ff88"

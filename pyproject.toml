@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "toktopus"
 version = "1.1.0"
-description = "Universal Terminal Monitor for AI Coding Agents (Antigravity, Claude Code, OpenCode, Cursor)"
+description = "Real-time Terminal Activity and Token Monitor for AI Coding Agents (Antigravity, Claude Code, OpenCode, Cursor, Codex)"
 readme = "README.md"
-authors = [{ name = "Nadim Hider" }]
+authors = [{ name = "Nadim Hider", email = "nadim.hider@outlook.com" }]
 license = { text = "MIT" }
 requires-python = ">=3.9"
 dependencies = [
@@ -16,7 +16,6 @@ dependencies = [
 ]
 keywords = [
     "tui",
-    "btop",
     "terminal",
     "ai-agent",
     "tokens",
@@ -24,6 +23,7 @@ keywords = [
     "claude-code",
     "opencode",
     "cursor",
+    "codex",
     "monitoring",
     "benchmarks"
 ]
@@ -42,10 +42,9 @@ classifiers = [
 toktopus = "toktopus.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/nadimhider/toktopus"
-Repository = "https://github.com/nadimhider/toktopus"
-Issues = "https://github.com/nadimhider/toktopus/issues"
+Homepage = "https://github.com/NadimHider/toktopus"
+Repository = "https://github.com/NadimHider/toktopus"
+Issues = "https://github.com/NadimHider/toktopus/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["toktopus*"]

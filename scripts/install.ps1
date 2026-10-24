@@ -1,6 +1,6 @@
 # toktopus Windows One-Liner Installer
 # Usage:
-#   irm https://raw.githubusercontent.com/nadimhider/toktopus/main/scripts/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/NadimHider/toktopus/main/scripts/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
@@ -15,7 +15,7 @@ if (-not $pythonCmd) {
 
 Write-Host "[1/2] Installing dependencies and package via pip..." -ForegroundColor DarkCyan
 python -m pip install --upgrade --quiet rich psutil
-python -m pip install --upgrade --quiet git+https://github.com/nadimhider/toktopus.git
+python -m pip install --upgrade --quiet git+https://github.com/NadimHider/toktopus.git
 
 $wingetLinks = "$env:LOCALAPPDATA\Microsoft\WinGet\Links"
 if (Test-Path $wingetLinks) {

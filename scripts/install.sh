@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # toktopus Linux and macOS One-Liner Installer
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/nadimhider/toktopus/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/NadimHider/toktopus/main/scripts/install.sh | bash
 
 set -e
 
@@ -15,7 +15,7 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 python3 -m pip install --user --upgrade rich psutil
-python3 -m pip install --user --upgrade git+https://github.com/nadimhider/toktopus.git
+python3 -m pip install --user --upgrade git+https://github.com/NadimHider/toktopus.git
 
 echo ""
 echo "[OK] toktopus installed successfully!"
