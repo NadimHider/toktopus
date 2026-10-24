@@ -63,7 +63,7 @@ def main():
     )
     parser.add_argument(
         "--agent", "-a",
-        choices=["antigravity", "claude", "opencode", "cursor", "auto"],
+        choices=["antigravity", "claude", "opencode", "cursor", "codex", "auto"],
         default=saved_cfg.get("active_agent", "auto"),
         help="Target AI agent to monitor (default: saved config or auto)"
     )

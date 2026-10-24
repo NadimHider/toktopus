@@ -18,6 +18,7 @@ toktopus/adapters/__init__.py
 toktopus/adapters/antigravity.py
 toktopus/adapters/base.py
 toktopus/adapters/claude.py
+toktopus/adapters/codex.py
 toktopus/adapters/cursor.py
 toktopus/adapters/opencode.py
 toktopus/core/__init__.py

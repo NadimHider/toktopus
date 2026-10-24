@@ -77,6 +77,17 @@ TIER_LIMITS: Dict[str, Dict[str, Any]] = {
         "monthly_allowance_usd": 20.00,
         "is_subscription": True,
         "description": "Cursor Pro monthly developer subscription"
+    },
+    "codex-pro": {
+        "tier_name": "Codex / Copilot Pro",
+        "plan_badge": "[CODEX PRO]",
+        "max_context": 200_000,
+        "max_rpm": 300,
+        "max_tpm": 2_000_000,
+        "max_rpd": 20_000,
+        "monthly_allowance_usd": 19.00,
+        "is_subscription": True,
+        "description": "GitHub Copilot and OpenAI Codex developer plan"
     }
 }
 
@@ -96,14 +107,18 @@ PLAN_ALIASES: Dict[str, str] = {
     "opencode": "opencode-zen",
     "opencode-zen": "opencode-zen",
     "cursor": "cursor-pro",
-    "cursor-pro": "cursor-pro"
+    "cursor-pro": "cursor-pro",
+    "codex": "codex-pro",
+    "codex-pro": "codex-pro",
+    "copilot": "codex-pro"
 }
 
 AGENT_PLAN_CYCLE: Dict[str, List[str]] = {
     "antigravity": ["google-ai-pro", "gemini-payg", "gemini-free"],
     "claude": ["claude-pro", "claude-tier2"],
     "opencode": ["opencode-zen", "google-ai-pro"],
-    "cursor": ["cursor-pro", "claude-pro"]
+    "cursor": ["cursor-pro", "claude-pro"],
+    "codex": ["codex-pro", "claude-pro"]
 }
 
 def normalize_plan_key(raw_key: str, agent_key: str = "antigravity") -> str:
@@ -117,7 +132,8 @@ def normalize_plan_key(raw_key: str, agent_key: str = "antigravity") -> str:
         "antigravity": "google-ai-pro",
         "claude": "claude-pro",
         "opencode": "opencode-zen",
-        "cursor": "cursor-pro"
+        "cursor": "cursor-pro",
+        "codex": "codex-pro"
     }
     return fallback_map.get(agent_key, "google-ai-pro")
 

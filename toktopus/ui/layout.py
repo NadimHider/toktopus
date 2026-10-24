@@ -236,7 +236,8 @@ def build_dashboard(
     footer_text.append(" [2] Claude Code ", style="bold #00ff88" if active_agent_key == "claude" else "dim")
     footer_text.append(" [3] OpenCode ", style="bold #00ff88" if active_agent_key == "opencode" else "dim")
     footer_text.append(" [4] Cursor ", style="bold #00ff88" if active_agent_key == "cursor" else "dim")
-    footer_text.append(f" | [P] Plan: {limits['tier_name']}  [M] Pricing Model  [B] Benchmarks  [R] Refresh  [Q] Quit", style="bold white")
+    footer_text.append(" [5] Codex ", style="bold #00ff88" if active_agent_key == "codex" else "dim")
+    footer_text.append(f" | [P] Plan: {limits['tier_name']}  [M] Model  [B] Benchmarks  [R] Refresh  [Q] Quit", style="bold white")
 
     layout["footer"].update(Panel(footer_text, border_style="dim"))
 

@@ -7,7 +7,9 @@ AI_PROCESS_NAMES = {
     "opencode": "OpenCode CLI / Service",
     "claude": "Claude Code Runner",
     "cursor": "Cursor Agent Process",
-    "cursor-agent": "Cursor Background Agent"
+    "cursor-agent": "Cursor Background Agent",
+    "copilot": "GitHub Copilot Agent",
+    "codex": "OpenAI Codex Process"
 }
 
 _CACHED_PROCESSES: List[Dict[str, Any]] = []

@@ -3,7 +3,7 @@ from toktopus.adapters import ADAPTERS, get_adapter
 
 class TestAdapters(unittest.TestCase):
     def test_all_adapters_registered(self):
-        for name in ["antigravity", "claude", "opencode", "cursor"]:
+        for name in ["antigravity", "claude", "opencode", "cursor", "codex"]:
             self.assertIn(name, ADAPTERS)
             adapter = get_adapter(name)
             self.assertIsNotNone(adapter)

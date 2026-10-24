@@ -5,19 +5,22 @@ from toktopus.adapters.antigravity import AntigravityAdapter
 from toktopus.adapters.claude import ClaudeCodeAdapter
 from toktopus.adapters.opencode import OpenCodeAdapter
 from toktopus.adapters.cursor import CursorAdapter
+from toktopus.adapters.codex import CodexAdapter
 
 ADAPTERS: Dict[str, BaseAgentAdapter] = {
     "antigravity": AntigravityAdapter(),
     "claude": ClaudeCodeAdapter(),
     "opencode": OpenCodeAdapter(),
-    "cursor": CursorAdapter()
+    "cursor": CursorAdapter(),
+    "codex": CodexAdapter()
 }
 
 KEY_MAP = {
     "1": "antigravity",
     "2": "claude",
     "3": "opencode",
-    "4": "cursor"
+    "4": "cursor",
+    "5": "codex"
 }
 
 def get_adapter(name: str) -> BaseAgentAdapter:
@@ -26,7 +29,7 @@ def get_adapter(name: str) -> BaseAgentAdapter:
 def auto_detect_active_agent() -> str:
     # Quick disk check without heavy payload parsing
     home = Path.home()
-    
+
     ag_path = home / ".gemini" / "antigravity-cli" / "brain"
     if ag_path.exists():
         return "antigravity"
@@ -42,5 +45,9 @@ def auto_detect_active_agent() -> str:
     cursor_path = home / ".cursor"
     if cursor_path.exists():
         return "cursor"
+
+    codex_path = home / ".config" / "github-copilot"
+    if codex_path.exists():
+        return "codex"
 
     return "antigravity"
