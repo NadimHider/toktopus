@@ -17,10 +17,15 @@ toktopus is a personal hobby project I built to monitor token usage, active cont
 ## Features
 
 * Active Context Tracking: Shows memory load for the current prompt turn against model boundaries (like the 2M token window on Google AI Pro Plan) without mixing in past turn totals.
-* Account Rate Limits: Monitors tokens per minute (TPM) and requests per minute (RPM) against your plan limits to avoid 429 rate limit errors.
+* Context Utilization Warnings: Triggers an in-terminal alert whenever active context usage reaches 85% or higher so you can compact the session before hitting boundaries.
+* Session Elapsed Timer: Displays how long your current agent session has been active directly in the header bar.
+* Live Account Rate Limits: Monitors tokens per minute (TPM) and requests per minute (RPM) against your plan limits to avoid 429 rate limit errors.
 * Prompt Cache Analytics: Calculates cache hit percentages and estimated cost savings from reused prompt tokens.
-* Agent Process Telemetry: Checks local language servers and background agent processes without slowing down the terminal UI.
-* Frontier Model Benchmarks: Displays calibrated Coding ELO, SWE-bench Verified, and speed metrics for current frontier models.
+* Projected Hourly Burn: Computes your live token burn rate and projects session costs per hour based on current activity.
+* Agent Process & System Telemetry: Checks local language servers and background agent processes without slowing down the terminal UI, including optional GPU VRAM and utilization metrics.
+* Real Skills & Plugin Inventory: Dynamically counts your installed skills and plugins directly from the filesystem with a cached disk scanner.
+* Frontier Model Benchmarks: Displays weekly-calibrated Coding ELO, SWE-bench Verified, and throughput metrics for current frontier models.
+* Telemetry Export: Export instantaneous session snapshots as clean JSON files for scripting, CI runs, or usage auditing.
 * Agent Switching: Switch between Antigravity, Claude Code, OpenCode, Cursor, and Codex on the fly using number hotkeys.
 
 ---
@@ -29,16 +34,17 @@ toktopus is a personal hobby project I built to monitor token usage, active cont
 
 ```text
 +-----------------------------------------------------------------------------+
-| :: TOKTOPUS v1.1.0 :: Universal AI Agent Monitor  [Agent: Antigravity 2.0]   |
+| :: TOKTOPUS v1.2.0 :: Universal AI Agent Monitor  [Agent: Antigravity 2.0]   |
 +-----------------------------------------------------------------------------+
 | [CONTEXT WINDOW & ACCOUNT LIMITS]     | [TOKEN VELOCITY & STEP BURNS]       |
 | Model & Plan:    Gemini 3.8 Flash     | Session Volume:  2,302,020 total    |
 |                  Google AI Pro Plan   | Composition:     [==========--------|
 | Active Context:  4.2% (83k / 2,000k)  | Breakdown:       C: 2.0M In: 205k   |
 | Minute Limit:    2.1% [SAFE] (4.0M)   | Velocity:        20,193 tok/step    |
-| Cache Ratio:     90.9% [OPTIMAL]      | Sparkline:       ⡀⡀⠤⠶⠒⠊⠉⠑      |
+| Cache Ratio:     90.9% [OPTIMAL]      | Sparkline:       ..........         |
+| Session Billing: $0.1240 val | Saved  | Proj Burn:       $0.45/hr           |
 +-----------------------------------------------------------------------------+
-| [LIVE AI BENCHMARK INDEX] (Chatbot Arena / SWE-bench Verified)              |
+| [LIVE AI BENCHMARK INDEX] (Weekly Verified : 2026-10-25)                    |
 | Rank   Model Name           Coding ELO   SWE-bench   HumanEval   Throughput |
 | #1     GPT 6.1              1540         84.6%       98.4%       115 tok/s  |
 | #2     Claude 5.5           1535         83.9%       98.1%       95 tok/s   |
@@ -49,7 +55,7 @@ toktopus is a personal hobby project I built to monitor token usage, active cont
 | [SUB-AGENTS & SKILLS VAULT]           | [REAL-TIME AGENT STEP TRANSCRIPT]   |
 | * research            [ACTIVE]        | #111 [PLANNER_RESPONSE] 83,200 tok  |
 | * team-lead           [IDLE]          | #112 [TOOL_CALL] bash  2,400 tok    |
-| Skills: 374 | Plugins: 93             | #113 [PLANNER_RESPONSE] 1,120 tok   |
+| Installed Skills: 378 | Plugins: 115  | #113 [PLANNER_RESPONSE] 1,120 tok   |
 +-----------------------------------------------------------------------------+
 | [SYSTEM LOAD & PROCESS TELEMETRY]                                           |
 | Host CPU: [====--------] 14.2%  |  Host RAM: [========----] 12.4 / 32.0 GB  |
@@ -96,8 +102,10 @@ toktopus
 | `--agent <name>` | `-a` | Select active agent (`antigravity`, `claude`, `opencode`, `cursor`, `codex`, `auto`) |
 | `--plan <tier>` | `-p` | Set active plan tier (`pro`, `payg`, `free`, `claude-pro`, `opencode-zen`, `codex-pro`) |
 | `--once` | | Output a single snapshot and exit (useful for scripts) |
+| `--export <path>` | `-e` | Export current telemetry snapshot as JSON to file and exit |
 | `--benchmarks` | `-b` | Display benchmark leaderboard table and exit |
 | `--rate <sec>` | `-r` | Refresh interval in seconds (default: 1.0) |
+| `--no-color` | | Disable color styling (also respects NO_COLOR env var) |
 | `--version` | `-v` | Display version information |
 
 ---

@@ -1,6 +1,6 @@
 import unittest
 from toktopus.core.pricing import calculate_costs
-from toktopus.core.benchmarks import get_benchmarks, find_model_benchmark
+from toktopus.core.benchmarks import get_benchmarks, find_model_benchmark, get_benchmarks_last_updated
 
 class TestPricingAndBenchmarks(unittest.TestCase):
     def test_calculate_costs(self):
@@ -17,6 +17,11 @@ class TestPricingAndBenchmarks(unittest.TestCase):
     def test_find_benchmark(self):
         m = find_model_benchmark("claude-3-7-sonnet")
         self.assertIn("Claude", m["name"])
+
+    def test_benchmarks_last_updated(self):
+        dt_str = get_benchmarks_last_updated()
+        self.assertIsInstance(dt_str, str)
+        self.assertIn("2026", dt_str)
 
 if __name__ == "__main__":
     unittest.main()

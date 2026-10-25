@@ -1,5 +1,7 @@
 import time
-from typing import Dict, List, Any
+import subprocess
+import shutil
+from typing import Dict, List, Any, Optional
 import psutil
 
 AI_PROCESS_NAMES = {
@@ -13,6 +15,7 @@ AI_PROCESS_NAMES = {
 }
 
 _CACHED_PROCESSES: List[Dict[str, Any]] = []
+_CACHED_GPU: Optional[Dict[str, Any]] = None
 _LAST_SCAN_TIME: float = 0.0
 _SCAN_INTERVAL: float = 3.0
 _INITIALIZED: bool = False
@@ -65,12 +68,38 @@ def _scan_ai_processes() -> List[Dict[str, Any]]:
     found_processes.sort(key=lambda p: p["mem_mb"], reverse=True)
     return found_processes
 
+def _scan_gpu_telemetry() -> Optional[Dict[str, Any]]:
+    if not shutil.which("nvidia-smi"):
+        return None
+
+    try:
+        cmd = [
+            "nvidia-smi",
+            "--query-gpu=utilization.gpu,memory.used,memory.total,name",
+            "--format=csv,noheader,nounits"
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=1.0)
+        if proc.returncode == 0 and proc.stdout.strip():
+            first_line = proc.stdout.strip().splitlines()[0]
+            parts = [p.strip() for p in first_line.split(",")]
+            if len(parts) >= 4:
+                return {
+                    "gpu_util_percent": float(parts[0]),
+                    "vram_used_mb": float(parts[1]),
+                    "vram_total_mb": float(parts[2]),
+                    "gpu_name": parts[3]
+                }
+    except Exception:
+        pass
+    return None
+
 def get_system_telemetry() -> Dict[str, Any]:
-    global _CACHED_PROCESSES, _LAST_SCAN_TIME, _INITIALIZED
+    global _CACHED_PROCESSES, _CACHED_GPU, _LAST_SCAN_TIME, _INITIALIZED
 
     now = time.time()
     if not _INITIALIZED or (now - _LAST_SCAN_TIME) >= _SCAN_INTERVAL:
         _CACHED_PROCESSES = _scan_ai_processes()
+        _CACHED_GPU = _scan_gpu_telemetry()
         _LAST_SCAN_TIME = now
         _INITIALIZED = True
 
@@ -91,5 +120,6 @@ def get_system_telemetry() -> Dict[str, Any]:
         "host_ram_percent": ram_percent,
         "ai_processes": _CACHED_PROCESSES[:6],
         "total_ai_cpu": round(total_ai_cpu, 1),
-        "total_ai_mem_mb": round(total_ai_mem_mb, 1)
+        "total_ai_mem_mb": round(total_ai_mem_mb, 1),
+        "gpu": _CACHED_GPU
     }

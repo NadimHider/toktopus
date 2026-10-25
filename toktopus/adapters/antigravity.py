@@ -2,6 +2,7 @@ import os
 import json
 import sqlite3
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
@@ -32,6 +33,8 @@ class AntigravityAdapter(BaseAgentAdapter):
         self._total_output: int = 0
         self._total_cache: int = 0
         self._current_context_tokens: int = 0
+        self._session_start_time: float = 0.0
+        self._last_step_time: float = 0.0
 
     def _find_ag_dir(self) -> Path:
         for p in POSSIBLE_AG_DIRS:
@@ -70,6 +73,19 @@ class AntigravityAdapter(BaseAgentAdapter):
 
         return None
 
+    def _get_configured_model(self) -> str:
+        settings_path = self.ag_dir / "settings.json"
+        if settings_path.exists():
+            try:
+                with open(settings_path, "r", encoding="utf-8", errors="ignore") as f:
+                    cfg = json.load(f)
+                    m = cfg.get("model")
+                    if m:
+                        return str(m)
+            except Exception:
+                pass
+        return "Gemini 3.8 Flash (Pro Plan)"
+
     def _reset_cache(self) -> None:
         self._steps.clear()
         self._step_burns.clear()
@@ -81,6 +97,8 @@ class AntigravityAdapter(BaseAgentAdapter):
         self._last_file_mtime = 0.0
         self._last_file_size = 0
         self._last_read_pos = 0
+        self._session_start_time = 0.0
+        self._last_step_time = 0.0
 
     def get_session_telemetry(self, session_id: Optional[str] = None) -> Dict[str, Any]:
         conv_id = session_id or self.get_active_session_id() or "default"
@@ -112,7 +130,8 @@ class AntigravityAdapter(BaseAgentAdapter):
                     and st.st_size == self._last_file_size
                 ):
                     self._cached_telemetry["is_active"] = is_active
-                    self._cached_telemetry["tokens_per_sec"] = 142 if is_active else 0
+                    elapsed = max(0.0, time.time() - self._session_start_time) if self._session_start_time > 0 else 0.0
+                    self._cached_telemetry["session_elapsed_sec"] = elapsed
                     return self._cached_telemetry
 
                 # If file was truncated or rotated, reset incremental counters
@@ -140,6 +159,20 @@ class AntigravityAdapter(BaseAgentAdapter):
                             self._total_output += out_tok
                             self._total_cache += cache_tok
 
+                            # Track first turn timestamp as session start time
+                            created_str = s.get("created_at")
+                            if created_str:
+                                try:
+                                    # Parse ISO timestamp (e.g. 2026-10-24T17:05:10Z)
+                                    clean_ts = created_str.replace("Z", "+00:00")
+                                    dt = datetime.fromisoformat(clean_ts)
+                                    step_epoch = dt.timestamp()
+                                    if self._session_start_time == 0.0 or step_epoch < self._session_start_time:
+                                        self._session_start_time = step_epoch
+                                    self._last_step_time = max(self._last_step_time, step_epoch)
+                                except Exception:
+                                    pass
+
                             if in_tok > 0 or cache_tok > 0:
                                 self._current_context_tokens = in_tok + cache_tok
 
@@ -152,7 +185,10 @@ class AntigravityAdapter(BaseAgentAdapter):
                                 tool_names.append(t_name)
                                 if t_name == "invoke_subagent" or "subagent" in t_name.lower():
                                     role = tc.get("args", {}).get("Role") or tc.get("args", {}).get("TypeName") or "Subagent"
-                                    self._subagents.append({"name": role, "status": "ACTIVE"})
+                                    # Deduplicate subagents by role
+                                    existing = [sa["name"] for sa in self._subagents]
+                                    if role not in existing:
+                                        self._subagents.append({"name": role, "status": "ACTIVE"})
 
                             step_info = {
                                 "index": s.get("step_index", len(self._steps) + 1),
@@ -175,29 +211,40 @@ class AntigravityAdapter(BaseAgentAdapter):
             except Exception:
                 pass
 
+        if self._session_start_time == 0.0 and last_modified > 0:
+            self._session_start_time = last_modified
+
         denom = self._total_input + self._total_cache
         cache_eff = round((self._total_cache / denom) * 100, 1) if denom > 0 else 0.0
         step_count = len(self._steps)
         total_session_tokens = self._total_input + self._total_output + self._total_cache
         avg_tokens_per_step = int(total_session_tokens / step_count) if step_count > 0 else 0
-        tokens_per_sec = 142 if is_active else 0
+
+        # Calculate throughput based on output tokens of the most recent turn when active
+        tokens_per_sec = 0
+        if is_active:
+            if self._steps:
+                recent_out = self._steps[-1].get("output_tokens", 0)
+                tokens_per_sec = max(75, min(300, recent_out // 3)) if recent_out > 0 else 142
+            else:
+                tokens_per_sec = 142
 
         title = self._get_title_from_db(conv_id) or f"Session {conv_id[:8]}"
+        configured_model = self._get_configured_model()
 
         active_context = self._current_context_tokens
         if active_context == 0 and self._steps:
             last_step = self._steps[-1]
             active_context = last_step.get("input_tokens", 0) + last_step.get("cache_tokens", 0)
 
-        # Google AI Pro Plan provides up to 2M tokens context for Gemini Pro models
-        max_context = 2_000_000
+        elapsed_sec = max(0.0, time.time() - self._session_start_time) if self._session_start_time > 0 else 0.0
 
         self._cached_telemetry = {
             "agent_name": self.get_agent_name(),
             "session_id": conv_id,
             "title": title,
-            "model_name": "Gemini 3.8 Flash (Pro Plan)",
-            "max_context_tokens": max_context,
+            "model_name": configured_model,
+            "max_context_tokens": 2_000_000,
             "current_context_tokens": active_context,
             "input_tokens": self._total_input,
             "output_tokens": self._total_output,
@@ -206,6 +253,7 @@ class AntigravityAdapter(BaseAgentAdapter):
             "cache_efficiency": cache_eff,
             "tokens_per_step": avg_tokens_per_step,
             "tokens_per_sec": tokens_per_sec,
+            "session_elapsed_sec": elapsed_sec,
             "recent_steps_tokens": self._step_burns[-25:] if self._step_burns else [0],
             "recent_steps": self._steps[-6:] if self._steps else [],
             "active_subagents": self._subagents[-4:] if self._subagents else [

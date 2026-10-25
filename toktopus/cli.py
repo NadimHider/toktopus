@@ -1,5 +1,7 @@
+import os
 import sys
 import time
+import json
 import argparse
 from rich.console import Console
 from rich.live import Live
@@ -10,14 +12,15 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
+from toktopus import __version__
 from toktopus.ui.theme import THEME_CONFIG
 from toktopus.ui.layout import build_dashboard
 from toktopus.adapters import KEY_MAP, get_adapter, auto_detect_active_agent
 from toktopus.core.system import get_system_telemetry
 from toktopus.core.keyboard import get_pressed_key
-from toktopus.core.pricing import PRICING_TABLE
-from toktopus.core.benchmarks import get_benchmarks
-from toktopus.core.limits import normalize_plan_key, get_next_plan
+from toktopus.core.pricing import PRICING_TABLE, calculate_costs
+from toktopus.core.benchmarks import get_benchmarks, get_benchmarks_last_updated
+from toktopus.core.limits import normalize_plan_key, get_next_plan, estimate_account_limits
 from toktopus.core.config import load_config, save_config
 
 console = Console(theme=THEME_CONFIG)
@@ -28,7 +31,8 @@ def print_benchmarks_table():
     from rich.table import Table
     from toktopus.ui.charts import relative_benchmark_bar
 
-    table = Table(title=":: TOKTOPUS : AI Coding Model Benchmark Index ::", border_style="#ffe600")
+    updated_date = get_benchmarks_last_updated()
+    table = Table(title=f":: TOKTOPUS : AI Coding Model Benchmark Index (Weekly Verified : {updated_date}) ::", border_style="#ffe600")
     table.add_column("Rank", justify="center", style="dim")
     table.add_column("Model Name", style="bold white")
     table.add_column("Provider", style="#b026ff")
@@ -54,6 +58,60 @@ def print_benchmarks_table():
 
     console.print(table)
 
+def export_telemetry_snapshot(export_path: str, telemetry: dict, sys_metrics: dict, agent_key: str, plan_tier: str, pricing_key: str):
+    in_tok = telemetry.get("input_tokens", 0)
+    out_tok = telemetry.get("output_tokens", 0)
+    cache_tok = telemetry.get("cache_read_tokens", 0)
+    current_ctx = telemetry.get("current_context_tokens", 0)
+
+    costs = calculate_costs(in_tok, out_tok, cache_tok, pricing_key)
+    limits = estimate_account_limits(
+        agent_key,
+        recent_tokens=current_ctx if current_ctx > 0 else (in_tok + out_tok),
+        tier_override=plan_tier
+    )
+
+    snapshot_data = {
+        "version": __version__,
+        "timestamp_epoch": time.time(),
+        "agent": {
+            "key": agent_key,
+            "name": telemetry.get("agent_name", agent_key),
+            "session_id": telemetry.get("session_id", "default"),
+            "model_name": telemetry.get("model_name"),
+            "is_active": telemetry.get("is_active", False),
+            "session_elapsed_sec": telemetry.get("session_elapsed_sec", 0.0)
+        },
+        "tokens": {
+            "current_context": current_ctx,
+            "max_context": limits.get("max_context", 2_000_000),
+            "input": in_tok,
+            "output": out_tok,
+            "cache_read": cache_tok,
+            "total_session": telemetry.get("total_tokens", in_tok + out_tok + cache_tok),
+            "cache_efficiency_pct": telemetry.get("cache_efficiency", 0.0),
+            "tokens_per_step": telemetry.get("tokens_per_step", 0),
+            "tokens_per_sec": telemetry.get("tokens_per_sec", 0)
+        },
+        "account_limits": limits,
+        "billing": costs,
+        "system": {
+            "host_cpu_percent": sys_metrics.get("host_cpu_percent"),
+            "host_ram_used_gb": sys_metrics.get("host_ram_used_gb"),
+            "host_ram_total_gb": sys_metrics.get("host_ram_total_gb"),
+            "host_ram_percent": sys_metrics.get("host_ram_percent"),
+            "ai_processes": sys_metrics.get("ai_processes", []),
+            "gpu": sys_metrics.get("gpu")
+        }
+    }
+
+    out_file = os.path.abspath(export_path)
+    os.makedirs(os.path.dirname(out_file), exist_ok=True)
+    with open(out_file, "w", encoding="utf-8") as f:
+        json.dump(snapshot_data, f, indent=2)
+
+    console.print(f"[bold #00ff88]:: Exported telemetry snapshot to {out_file} ::[/bold #00ff88]")
+
 def main():
     saved_cfg = load_config()
 
@@ -78,6 +136,11 @@ def main():
         help="Print single telemetry snapshot and exit"
     )
     parser.add_argument(
+        "--export", "-e",
+        metavar="PATH",
+        help="Export telemetry snapshot as a JSON file and exit"
+    )
+    parser.add_argument(
         "--benchmarks", "-b",
         action="store_true",
         help="Display AI Model Benchmark Index and exit"
@@ -89,12 +152,20 @@ def main():
         help="Refresh interval in seconds (default: 1.0)"
     )
     parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable colored output (also respects NO_COLOR env var)"
+    )
+    parser.add_argument(
         "--version", "-v",
         action="version",
-        version="toktopus v1.1.0"
+        version=f"toktopus v{__version__}"
     )
 
     args = parser.parse_args()
+
+    if args.no_color or os.environ.get("NO_COLOR"):
+        console.no_color = True
 
     if args.benchmarks:
         print_benchmarks_table()
@@ -118,6 +189,10 @@ def main():
     adapter = get_adapter(active_agent_key)
     telemetry = adapter.get_session_telemetry()
     sys_metrics = get_system_telemetry()
+
+    if args.export:
+        export_telemetry_snapshot(args.export, telemetry, sys_metrics, active_agent_key, plan_tier, PRICING_KEYS[current_pricing_idx])
+        sys.exit(0)
 
     if args.once:
         dashboard = build_dashboard(

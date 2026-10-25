@@ -2,6 +2,8 @@ import json
 import urllib.request
 from typing import List, Dict, Any, Optional
 
+BENCHMARK_LAST_UPDATED: str = "2026-10-25"
+
 BENCHMARK_MATRIX: List[Dict[str, Any]] = [
     {
         "id": "gpt-6-1",
@@ -114,6 +116,11 @@ BENCHMARK_MATRIX: List[Dict[str, Any]] = [
 ]
 
 _LIVE_CACHE: Optional[List[Dict[str, Any]]] = None
+_CURRENT_UPDATED_DATE: str = BENCHMARK_LAST_UPDATED
+
+def get_benchmarks_last_updated() -> str:
+    global _CURRENT_UPDATED_DATE
+    return _CURRENT_UPDATED_DATE
 
 def get_benchmarks() -> List[Dict[str, Any]]:
     global _LIVE_CACHE
@@ -129,13 +136,20 @@ def find_model_benchmark(model_id_or_name: str) -> Dict[str, Any]:
     return BENCHMARK_MATRIX[0]
 
 def refresh_benchmarks_online(timeout_sec: float = 2.0) -> bool:
-    global _LIVE_CACHE
+    global _LIVE_CACHE, _CURRENT_UPDATED_DATE
     url = "https://raw.githubusercontent.com/NadimHider/toktopus/main/data/benchmarks.json"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "toktopus-monitor"})
         with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
             if resp.status == 200:
-                data = json.loads(resp.read().decode("utf-8"))
+                raw_data = json.loads(resp.read().decode("utf-8"))
+                if isinstance(raw_data, dict) and "models" in raw_data:
+                    data = raw_data["models"]
+                    if "last_updated" in raw_data:
+                        _CURRENT_UPDATED_DATE = str(raw_data["last_updated"])
+                else:
+                    data = raw_data
+
                 if isinstance(data, list) and len(data) > 0:
                     _LIVE_CACHE = sorted(data, key=lambda m: m.get("coding_elo", 0), reverse=True)
                     return True
