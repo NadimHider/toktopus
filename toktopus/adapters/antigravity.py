@@ -10,10 +10,15 @@ from toktopus.adapters.base import BaseAgentAdapter
 
 USER_HOME = Path.home()
 GEMINI_DIR = USER_HOME / ".gemini"
+
 POSSIBLE_AG_DIRS = [
+    Path(os.environ["ANTIGRAVITY_HOME"]) if os.environ.get("ANTIGRAVITY_HOME") else None,
+    Path(os.environ["GEMINI_CLI_HOME"]) if os.environ.get("GEMINI_CLI_HOME") else None,
+    Path(os.environ["GEMINI_HOME"]) / "antigravity-cli" if os.environ.get("GEMINI_HOME") else None,
     GEMINI_DIR / "antigravity-cli",
     GEMINI_DIR / "antigravity"
 ]
+POSSIBLE_AG_DIRS = [p for p in POSSIBLE_AG_DIRS if p is not None]
 
 class AntigravityAdapter(BaseAgentAdapter):
     def __init__(self):
@@ -22,6 +27,7 @@ class AntigravityAdapter(BaseAgentAdapter):
         self._cached_session_id: Optional[str] = None
         self._last_session_check: float = 0.0
         self._cached_telemetry: Optional[Dict[str, Any]] = None
+        self._active_transcript_path: Optional[Path] = None
         self._last_file_mtime: float = 0.0
         self._last_file_size: int = 0
         self._last_read_pos: int = 0
@@ -32,20 +38,24 @@ class AntigravityAdapter(BaseAgentAdapter):
         self._total_input: int = 0
         self._total_output: int = 0
         self._total_cache: int = 0
+        self._total_reasoning: int = 0
         self._current_context_tokens: int = 0
         self._session_start_time: float = 0.0
         self._last_step_time: float = 0.0
+        self._last_turn_duration_sec: float = 0.0
 
     def _find_ag_dir(self) -> Path:
         for p in POSSIBLE_AG_DIRS:
             if p.exists():
                 return p
-        return POSSIBLE_AG_DIRS[0]
+        return POSSIBLE_AG_DIRS[0] if POSSIBLE_AG_DIRS else GEMINI_DIR / "antigravity-cli"
 
     def get_agent_name(self) -> str:
         return "Antigravity 2.0"
 
     def is_detected(self) -> bool:
+        if not self.ag_dir.exists():
+            self.ag_dir = self._find_ag_dir()
         return self.ag_dir.exists()
 
     def get_active_session_id(self) -> Optional[str]:
@@ -53,19 +63,42 @@ class AntigravityAdapter(BaseAgentAdapter):
         if self._cached_session_id and (now - self._last_session_check) < 2.0:
             return self._cached_session_id
 
+        if not self.ag_dir.exists():
+            self.ag_dir = self._find_ag_dir()
+
         brain_dir = self.ag_dir / "brain"
         if not brain_dir.exists():
             return None
 
-        # Sort conversation directories by recent folder modification
+        # Sort conversation directories by actual transcript modification time
         try:
-            entries = [
-                d for d in brain_dir.iterdir()
-                if d.is_dir() and not d.name.startswith(".")
-            ]
-            if entries:
-                entries.sort(key=lambda x: x.stat().st_mtime, reverse=True)
-                self._cached_session_id = entries[0].name
+            candidates: List[tuple] = []
+            for d in brain_dir.iterdir():
+                if not d.is_dir() or d.name.startswith("."):
+                    continue
+                t1 = d / ".system_generated" / "logs" / "transcript.jsonl"
+                t2 = d / ".system_generated" / "logs" / "transcript_full.jsonl"
+                mtime = 0.0
+                if t1.exists():
+                    try:
+                        mtime = max(mtime, t1.stat().st_mtime)
+                    except Exception:
+                        pass
+                if t2.exists():
+                    try:
+                        mtime = max(mtime, t2.stat().st_mtime)
+                    except Exception:
+                        pass
+                if mtime == 0.0:
+                    try:
+                        mtime = d.stat().st_mtime
+                    except Exception:
+                        pass
+                candidates.append((d.name, mtime))
+
+            if candidates:
+                candidates.sort(key=lambda x: x[1], reverse=True)
+                self._cached_session_id = candidates[0][0]
                 self._last_session_check = now
                 return self._cached_session_id
         except Exception:
@@ -86,6 +119,18 @@ class AntigravityAdapter(BaseAgentAdapter):
                 pass
         return "Gemini 3.8 Flash (Pro Plan)"
 
+    def _get_context_limit_for_model(self, model_name: str) -> int:
+        lower = model_name.lower()
+        if "gemini" in lower:
+            return 2_000_000
+        elif "claude" in lower:
+            return 200_000
+        elif "gpt-4" in lower or "o1" in lower or "o3" in lower:
+            return 128_000
+        elif "deepseek" in lower:
+            return 128_000
+        return 1_000_000
+
     def _reset_cache(self) -> None:
         self._steps.clear()
         self._step_burns.clear()
@@ -93,12 +138,14 @@ class AntigravityAdapter(BaseAgentAdapter):
         self._total_input = 0
         self._total_output = 0
         self._total_cache = 0
+        self._total_reasoning = 0
         self._current_context_tokens = 0
         self._last_file_mtime = 0.0
         self._last_file_size = 0
         self._last_read_pos = 0
         self._session_start_time = 0.0
         self._last_step_time = 0.0
+        self._last_turn_duration_sec = 0.0
 
     def get_session_telemetry(self, session_id: Optional[str] = None) -> Dict[str, Any]:
         conv_id = session_id or self.get_active_session_id() or "default"
@@ -106,6 +153,7 @@ class AntigravityAdapter(BaseAgentAdapter):
             self._reset_cache()
             self._cached_telemetry = None
             self._active_conv_id = conv_id
+            self._active_transcript_path = None
 
         brain_dir = self.ag_dir / "brain"
         log_dir = brain_dir / conv_id / ".system_generated" / "logs"
@@ -113,6 +161,11 @@ class AntigravityAdapter(BaseAgentAdapter):
         compact_path = log_dir / "transcript.jsonl"
         full_path = log_dir / "transcript_full.jsonl"
         transcript_path = compact_path if compact_path.exists() else full_path
+
+        # If transcript path switched between compact and full, reset cached offset
+        if self._active_transcript_path and self._active_transcript_path != transcript_path:
+            self._reset_cache()
+        self._active_transcript_path = transcript_path
 
         is_active = False
         last_modified = 0.0
@@ -144,31 +197,47 @@ class AntigravityAdapter(BaseAgentAdapter):
                     else:
                         self._reset_cache()
 
-                    for line in f:
-                        line = line.strip()
+                    bytes_parsed = self._last_read_pos
+                    while True:
+                        line_start_pos = f.tell()
+                        line = f.readline()
                         if not line:
+                            break
+                        # Guard against partially flushed lines: only commit if line ends with newline
+                        if not line.endswith("\n") and not line.endswith("\r"):
+                            # Incomplete trailing line, rewind to line start and stop
+                            f.seek(line_start_pos)
+                            break
+
+                        stripped = line.strip()
+                        if not stripped:
+                            bytes_parsed = f.tell()
                             continue
+
                         try:
-                            s = json.loads(line)
+                            s = json.loads(stripped)
                             in_tok = s.get("input_tokens") or 0
                             out_tok = s.get("output_tokens") or 0
                             cache_tok = s.get("cache_read_tokens") or 0
+                            reason_tok = s.get("thinking_tokens") or s.get("reasoning_tokens") or s.get("thoughtsTokenCount") or 0
 
-                            step_total = in_tok + out_tok + cache_tok
+                            step_total = in_tok + out_tok + cache_tok + reason_tok
                             self._total_input += in_tok
                             self._total_output += out_tok
                             self._total_cache += cache_tok
+                            self._total_reasoning += reason_tok
 
                             # Track first turn timestamp as session start time
                             created_str = s.get("created_at")
                             if created_str:
                                 try:
-                                    # Parse ISO timestamp (e.g. 2026-10-24T17:05:10Z)
                                     clean_ts = created_str.replace("Z", "+00:00")
                                     dt = datetime.fromisoformat(clean_ts)
                                     step_epoch = dt.timestamp()
                                     if self._session_start_time == 0.0 or step_epoch < self._session_start_time:
                                         self._session_start_time = step_epoch
+                                    if self._last_step_time > 0 and step_epoch > self._last_step_time:
+                                        self._last_turn_duration_sec = max(0.2, step_epoch - self._last_step_time)
                                     self._last_step_time = max(self._last_step_time, step_epoch)
                                 except Exception:
                                     pass
@@ -184,8 +253,8 @@ class AntigravityAdapter(BaseAgentAdapter):
                                 t_name = tc.get("toolSummary") or tc.get("name") or "tool"
                                 tool_names.append(t_name)
                                 if t_name == "invoke_subagent" or "subagent" in t_name.lower():
-                                    role = tc.get("args", {}).get("Role") or tc.get("args", {}).get("TypeName") or "Subagent"
-                                    # Deduplicate subagents by role
+                                    args = tc.get("args") or {}
+                                    role = args.get("Role") or args.get("TypeName") or "Subagent"
                                     existing = [sa["name"] for sa in self._subagents]
                                     if role not in existing:
                                         self._subagents.append({"name": role, "status": "ACTIVE"})
@@ -198,13 +267,17 @@ class AntigravityAdapter(BaseAgentAdapter):
                                 "input_tokens": in_tok,
                                 "output_tokens": out_tok,
                                 "cache_tokens": cache_tok,
+                                "reasoning_tokens": reason_tok,
                                 "total_tokens": step_total
                             }
                             self._steps.append(step_info)
+                            bytes_parsed = f.tell()
                         except Exception:
+                            # If corrupted line, skip it and advance
+                            bytes_parsed = f.tell()
                             continue
 
-                    self._last_read_pos = f.tell()
+                    self._last_read_pos = bytes_parsed
                     self._last_file_mtime = st.st_mtime
                     self._last_file_size = st.st_size
 
@@ -217,20 +290,26 @@ class AntigravityAdapter(BaseAgentAdapter):
         denom = self._total_input + self._total_cache
         cache_eff = round((self._total_cache / denom) * 100, 1) if denom > 0 else 0.0
         step_count = len(self._steps)
-        total_session_tokens = self._total_input + self._total_output + self._total_cache
+        total_session_tokens = self._total_input + self._total_output + self._total_cache + self._total_reasoning
         avg_tokens_per_step = int(total_session_tokens / step_count) if step_count > 0 else 0
 
-        # Calculate throughput based on output tokens of the most recent turn when active
+        # Calculate throughput using real output tokens and turn duration when active
         tokens_per_sec = 0
         if is_active:
             if self._steps:
-                recent_out = self._steps[-1].get("output_tokens", 0)
-                tokens_per_sec = max(75, min(300, recent_out // 3)) if recent_out > 0 else 142
+                recent_out = self._steps[-1].get("output_tokens", 0) + self._steps[-1].get("reasoning_tokens", 0)
+                if recent_out > 0 and self._last_turn_duration_sec > 0:
+                    tokens_per_sec = max(10, min(600, int(recent_out / self._last_turn_duration_sec)))
+                elif recent_out > 0:
+                    tokens_per_sec = max(30, min(300, recent_out // 2))
+                else:
+                    tokens_per_sec = 0
             else:
-                tokens_per_sec = 142
+                tokens_per_sec = 0
 
         title = self._get_title_from_db(conv_id) or f"Session {conv_id[:8]}"
         configured_model = self._get_configured_model()
+        max_ctx = self._get_context_limit_for_model(configured_model)
 
         active_context = self._current_context_tokens
         if active_context == 0 and self._steps:
@@ -239,16 +318,20 @@ class AntigravityAdapter(BaseAgentAdapter):
 
         elapsed_sec = max(0.0, time.time() - self._session_start_time) if self._session_start_time > 0 else 0.0
 
+        # Remove fake fallback subagents
+        active_subagents = self._subagents[-4:] if self._subagents else []
+
         self._cached_telemetry = {
             "agent_name": self.get_agent_name(),
             "session_id": conv_id,
             "title": title,
             "model_name": configured_model,
-            "max_context_tokens": 2_000_000,
+            "max_context_tokens": max_ctx,
             "current_context_tokens": active_context,
             "input_tokens": self._total_input,
             "output_tokens": self._total_output,
             "cache_read_tokens": self._total_cache,
+            "reasoning_tokens": self._total_reasoning,
             "total_tokens": total_session_tokens,
             "cache_efficiency": cache_eff,
             "tokens_per_step": avg_tokens_per_step,
@@ -256,10 +339,7 @@ class AntigravityAdapter(BaseAgentAdapter):
             "session_elapsed_sec": elapsed_sec,
             "recent_steps_tokens": self._step_burns[-25:] if self._step_burns else [0],
             "recent_steps": self._steps[-6:] if self._steps else [],
-            "active_subagents": self._subagents[-4:] if self._subagents else [
-                {"name": "research", "status": "IDLE"},
-                {"name": "team-lead", "status": "IDLE"}
-            ],
+            "active_subagents": active_subagents,
             "is_active": is_active,
             "last_modified": last_modified
         }
@@ -269,16 +349,21 @@ class AntigravityAdapter(BaseAgentAdapter):
         db_path = self.ag_dir / "conversation_summaries.db"
         if not db_path.exists():
             return None
+        conn = None
         try:
-            # Query with read-only URI to prevent file locking collisions on Windows
             uri = f"file:{db_path.as_posix()}?mode=ro"
-            conn = sqlite3.connect(uri, uri=True, timeout=0.5)
+            conn = sqlite3.connect(uri, uri=True, timeout=1.0)
             cur = conn.cursor()
             cur.execute("SELECT title FROM conversation_summaries WHERE conversation_id = ?", (conv_id,))
             row = cur.fetchone()
-            conn.close()
             if row and row[0]:
                 return row[0].strip()
         except Exception:
             pass
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
         return None

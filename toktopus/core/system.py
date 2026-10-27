@@ -1,3 +1,4 @@
+import os
 import time
 import subprocess
 import shutil
@@ -5,7 +6,7 @@ from typing import Dict, List, Any, Optional
 import psutil
 
 AI_PROCESS_NAMES = {
-    "language_server": "Antigravity Language Server",
+    "antigravity": "Antigravity Agent",
     "opencode": "OpenCode CLI / Service",
     "claude": "Claude Code Runner",
     "cursor": "Cursor Agent Process",
@@ -21,8 +22,6 @@ _SCAN_INTERVAL: float = 3.0
 _INITIALIZED: bool = False
 
 def _scan_ai_processes() -> List[Dict[str, Any]]:
-    # Windows process queries are throttled here because calling cmdline across
-    # every running process on every tick introduces noticeable latency.
     found_processes: List[Dict[str, Any]] = []
 
     try:
@@ -37,7 +36,21 @@ def _scan_ai_processes() -> List[Dict[str, Any]]:
                         matched_label = label
                         break
 
-                if not matched_label and lower_name in ("python.exe", "python3.exe", "node.exe", "electron.exe"):
+                # Also inspect language_server if it explicitly mentions antigravity or gemini
+                if not matched_label and "language_server" in lower_name:
+                    try:
+                        cmdline_str = " ".join(proc.cmdline() or []).lower()
+                        if "antigravity" in cmdline_str or "gemini" in cmdline_str:
+                            matched_label = "Antigravity Language Server"
+                    except (psutil.AccessDenied, psutil.NoSuchProcess):
+                        pass
+
+                # Inspect script runners on Windows, Linux, and macOS
+                is_script_runner = lower_name in (
+                    "python.exe", "python3.exe", "node.exe", "electron.exe",
+                    "python", "python3", "node", "electron"
+                )
+                if not matched_label and is_script_runner:
                     try:
                         cmdline_str = " ".join(proc.cmdline() or []).lower()
                         for key, label in AI_PROCESS_NAMES.items():
@@ -78,7 +91,8 @@ def _scan_gpu_telemetry() -> Optional[Dict[str, Any]]:
             "--query-gpu=utilization.gpu,memory.used,memory.total,name",
             "--format=csv,noheader,nounits"
         ]
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=1.0)
+        creationflags = 0x08000000 if os.name == "nt" else 0
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=1.0, creationflags=creationflags)
         if proc.returncode == 0 and proc.stdout.strip():
             first_line = proc.stdout.strip().splitlines()[0]
             parts = [p.strip() for p in first_line.split(",")]
@@ -103,15 +117,15 @@ def get_system_telemetry() -> Dict[str, Any]:
         _LAST_SCAN_TIME = now
         _INITIALIZED = True
 
-    cpu_percent = psutil.cpu_percent(interval=None)
+    cpu_percent = psutil.cpu_percent(interval=None) or 0.0
     mem = psutil.virtual_memory()
 
     total_ram_gb = round(mem.total / (1024 ** 3), 1)
     used_ram_gb = round(mem.used / (1024 ** 3), 1)
-    ram_percent = mem.percent
+    ram_percent = mem.percent or 0.0
 
-    total_ai_cpu = sum(p["cpu_percent"] for p in _CACHED_PROCESSES)
-    total_ai_mem_mb = sum(p["mem_mb"] for p in _CACHED_PROCESSES)
+    total_ai_cpu = sum(p.get("cpu_percent", 0.0) or 0.0 for p in _CACHED_PROCESSES)
+    total_ai_mem_mb = sum(p.get("mem_mb", 0.0) or 0.0 for p in _CACHED_PROCESSES)
 
     return {
         "host_cpu_percent": cpu_percent,

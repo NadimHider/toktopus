@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from rich.layout import Layout
 from rich.panel import Panel
 from rich.table import Table
@@ -37,16 +37,35 @@ def build_dashboard(
     active_agent_key: str,
     pricing_model_key: str,
     plan_tier_key: str = "google-ai-pro",
-    show_full_benchmarks: bool = False
+    show_full_benchmarks: bool = False,
+    console_height: Optional[int] = None
 ) -> Layout:
     layout = Layout()
 
+    # Dynamic row allocation based on terminal height
+    h = console_height or 42
+    if h < 32:
+        top_size = 9
+        bench_size = 6 if not show_full_benchmarks else 9
+        mid_size = 6
+        sys_size = 5
+    elif h < 38:
+        top_size = 11
+        bench_size = 7 if not show_full_benchmarks else 11
+        mid_size = 7
+        sys_size = 5
+    else:
+        top_size = 12
+        bench_size = 9 if not show_full_benchmarks else 14
+        mid_size = 9
+        sys_size = 6
+
     layout.split_column(
         Layout(name="header", size=3),
-        Layout(name="top_row", size=12),
-        Layout(name="benchmarks", size=9 if not show_full_benchmarks else 14),
-        Layout(name="middle_row", size=9),
-        Layout(name="system_row", size=6),
+        Layout(name="top_row", size=top_size),
+        Layout(name="benchmarks", size=bench_size),
+        Layout(name="middle_row", size=mid_size),
+        Layout(name="system_row", size=sys_size),
         Layout(name="footer", size=3)
     )
 
@@ -80,11 +99,16 @@ def build_dashboard(
     in_tok = telemetry.get("input_tokens", 0)
     out_tok = telemetry.get("output_tokens", 0)
     cache_tok = telemetry.get("cache_read_tokens", 0)
-    total_sess_tok = telemetry.get("total_tokens", in_tok + out_tok + cache_tok)
+    reason_tok = telemetry.get("reasoning_tokens", 0)
+    total_sess_tok = telemetry.get("total_tokens", in_tok + out_tok + cache_tok + reason_tok)
     cache_eff = telemetry.get("cache_efficiency", 0.0)
     model_name = telemetry.get("model_name", "Gemini 3.8 Flash")
 
-    costs = calculate_costs(in_tok, out_tok, cache_tok, pricing_model_key)
+    costs = calculate_costs(in_tok, out_tok + reason_tok, cache_tok, pricing_model_key)
+    agent_cost = telemetry.get("session_cost", 0.0)
+    if agent_cost > 0:
+        costs["cost_spent_usd"] = agent_cost
+
     limits = estimate_account_limits(
         active_agent_key,
         recent_tokens=current_ctx if current_ctx > 0 else (in_tok + out_tok),
@@ -146,6 +170,14 @@ def build_dashboard(
     tok_per_sec = telemetry.get("tokens_per_sec", 0)
     sparkline_str = braille_sparkline(step_burns, max_width=26)
 
+    breakdown_parts = [
+        f"[#00ff88]C: {cache_tok:,}[/#00ff88]",
+        f"[#00f3ff]In: {in_tok:,}[/#00f3ff]",
+        f"[#b026ff]Out: {out_tok:,}[/#b026ff]"
+    ]
+    if reason_tok > 0:
+        breakdown_parts.append(f"[#ffe600]R: {reason_tok:,}[/#ffe600]")
+
     velocity_table = Table.grid(padding=(0, 1))
     velocity_table.add_row(
         "[bold white]Session Volume:[/bold white]",
@@ -153,11 +185,11 @@ def build_dashboard(
     )
     velocity_table.add_row(
         "[bold white]Composition:[/bold white]",
-        f"[{stacked_token_ratio_bar(cache_tok, in_tok, out_tok)}] [dim]Cached / Fresh In / Gen Out[/dim]"
+        f"{stacked_token_ratio_bar(cache_tok, in_tok, out_tok + reason_tok)} [dim]Cached / Fresh In / Gen Out[/dim]"
     )
     velocity_table.add_row(
         "[bold white]Breakdown:[/bold white]",
-        f"[#00ff88]C: {cache_tok:,}[/#00ff88]  [#00f3ff]In: {in_tok:,}[/#00f3ff]  [#b026ff]Out: {out_tok:,}[/#b026ff]"
+        "  ".join(breakdown_parts)
     )
     velocity_table.add_row(
         "[bold white]Velocity / Rate:[/bold white]",
@@ -182,7 +214,7 @@ def build_dashboard(
     bench_table.add_column("Relative Index", style="#00f3ff")
 
     benchmarks = get_benchmarks()
-    display_bench = benchmarks if show_full_benchmarks else benchmarks[:4]
+    display_bench = benchmarks if show_full_benchmarks else benchmarks[:3]
 
     for b in display_bench:
         is_cur = (model_name.lower() in b["name"].lower()) or (b["name"].lower() in model_name.lower())
@@ -200,31 +232,39 @@ def build_dashboard(
             style=name_style if is_cur else None
         )
 
-    updated_date = get_benchmarks_last_updated()
-    layout["benchmarks"].update(
-        Panel(
-            bench_table,
-            title=f"[bold #ffe600][LIVE AI BENCHMARK INDEX] (Weekly Verified : {updated_date})[/bold #ffe600]",
-            border_style="#ffe600"
-        )
-    )
+    last_updated_str = get_benchmarks_last_updated()
+    bench_title = f"[bold #ffe600][LIVE AI BENCHMARK INDEX][/bold #ffe600] [dim](Weekly Verified : {last_updated_str})[/dim]"
+    layout["benchmarks"].update(Panel(bench_table, title=bench_title, border_style="#ffe600"))
 
     layout["middle_row"].split_row(
-        Layout(name="subagents_box", ratio=4),
-        Layout(name="transcript_box", ratio=6)
+        Layout(name="subagents_box", ratio=1),
+        Layout(name="transcript_box", ratio=2)
     )
 
-    subagents = telemetry.get("active_subagents", [])
     sub_table = Table.grid(padding=(0, 1))
-    for ag in subagents[:4]:
-        status_color = "#00ff88" if ag["status"] == "ACTIVE" else "dim"
-        sub_table.add_row(f"[white]* {ag['name']}[/white]", f"[{status_color}][{ag['status']}][/{status_color}]")
+    subagents = telemetry.get("active_subagents", [])
 
-    skills_counts = count_skills_and_plugins(active_agent_key)
+    skills_data = count_skills_and_plugins(active_agent_key)
+    skills_count = skills_data.get("skills", skills_data.get("skills_count", 0))
+    plugins_count = skills_data.get("plugins", skills_data.get("plugins_count", 0))
+
     sub_table.add_row(
-        f"[dim]Installed Skills:[/dim] [bold #00f3ff]{skills_counts['skills']}[/bold #00f3ff]",
-        f"[dim]Plugins:[/dim] [bold #b026ff]{skills_counts['plugins']}[/bold #b026ff]"
+        "[bold white]Skills & Plugins:[/bold white]",
+        f"[bold #00ff88]{skills_count}[/bold #00ff88] skills  |  [bold #00f3ff]{plugins_count}[/bold #00f3ff] plugins"
     )
+
+    if subagents:
+        for sa in subagents[:3]:
+            st_color = "#00ff88" if sa.get("status") == "ACTIVE" else "dim"
+            sub_table.add_row(
+                f"[bold white]{sa.get('name', 'subagent')}[/bold white]",
+                f"[{st_color}]{sa.get('status', 'IDLE')}[/{st_color}]"
+            )
+    else:
+        sub_table.add_row(
+            "[dim]Subagents:[/dim]",
+            "[dim]No auxiliary subagents currently spawned[/dim]"
+        )
 
     layout["middle_row"]["subagents_box"].update(
         Panel(sub_table, title="[bold #00ff88][SUB-AGENTS & SKILLS VAULT][/bold #00ff88]", border_style="#00ff88")
@@ -232,23 +272,29 @@ def build_dashboard(
 
     recent_steps = telemetry.get("recent_steps", [])
     step_table = Table.grid(padding=(0, 1))
-    for stp in recent_steps[-3:]:
-        tools_str = ", ".join(stp.get("tools", [])) or "direct prompt"
+    if recent_steps:
+        for stp in recent_steps[-3:]:
+            tools_str = ", ".join(stp.get("tools", [])) or "direct prompt"
+            step_table.add_row(
+                f"[bold #00f3ff]#{stp.get('index', 0)}[/bold #00f3ff]",
+                f"[white][{stp.get('type', 'STEP')}][/white]",
+                f"[dim]{tools_str[:35]}[/dim]",
+                f"[#ffe600]{stp.get('total_tokens', 0):,} tok[/#ffe600]"
+            )
+    else:
         step_table.add_row(
-            f"[bold #00f3ff]#{stp.get('index', 0)}[/bold #00f3ff]",
-            f"[white][{stp.get('type', 'STEP')}][/white]",
-            f"[dim]{tools_str[:35]}[/dim]",
-            f"[#ffe600]{stp.get('total_tokens', 0):,} tok[/#ffe600]"
+            "[dim]Transcript:[/dim]",
+            "[dim]Waiting for next agent prompt/response turn...[/dim]"
         )
 
     layout["middle_row"]["transcript_box"].update(
         Panel(step_table, title="[bold white][REAL-TIME AGENT STEP TRANSCRIPT][/bold white]", border_style="dim")
     )
 
-    host_cpu = sys_metrics.get("host_cpu_percent", 0.0)
-    host_ram_used = sys_metrics.get("host_ram_used_gb", 0.0)
-    host_ram_total = sys_metrics.get("host_ram_total_gb", 32.0)
-    host_ram_pct = sys_metrics.get("host_ram_percent", 0.0)
+    host_cpu = sys_metrics.get("host_cpu_percent") or 0.0
+    host_ram_used = sys_metrics.get("host_ram_used_gb") or 0.0
+    host_ram_total = sys_metrics.get("host_ram_total_gb") or 32.0
+    host_ram_pct = sys_metrics.get("host_ram_percent") or 0.0
     ai_procs = sys_metrics.get("ai_processes", [])
     gpu_data = sys_metrics.get("gpu")
 
@@ -257,17 +303,18 @@ def build_dashboard(
     sys_text.append(f"Host RAM: [{mini_cpu_gauge(host_ram_pct)}] {host_ram_used:.1f} / {host_ram_total:.1f} GB ({host_ram_pct:.1f}%)", style="white")
 
     if gpu_data:
-        gpu_util = gpu_data.get("gpu_util_percent", 0.0)
-        vram_used = gpu_data.get("vram_used_mb", 0.0) / 1024.0
-        vram_total = gpu_data.get("vram_total_mb", 0.0) / 1024.0
-        sys_text.append(f"  |  GPU: [{mini_cpu_gauge(gpu_util)}] {gpu_util:.0f}% ({vram_used:.1f}/{vram_total:.1f} GB VRAM)", style="bold #ffe600")
+        gpu_util = gpu_data.get("gpu_util_percent") or 0.0
+        vram_used = (gpu_data.get("vram_used_mb") or 0.0) / 1024.0
+        vram_total = (gpu_data.get("vram_total_mb") or 0.0) / 1024.0
+        gpu_name = gpu_data.get("gpu_name") or "GPU"
+        sys_text.append(f"  |  {gpu_name}: [{mini_cpu_gauge(gpu_util)}] {gpu_util:.0f}% ({vram_used:.1f}/{vram_total:.1f} GB VRAM)", style="bold #ffe600")
 
     sys_text.append("\nActive AI Agent Processes: ", style="bold #00f3ff")
 
     if ai_procs:
         proc_snippets = []
         for p in ai_procs[:3]:
-            proc_snippets.append(f"{p['label']} (PID {p['pid']}): CPU {p['cpu_percent']:.1f}% | RAM {p['mem_mb']:.0f} MB")
+            proc_snippets.append(f"{p['label']} (PID {p['pid']}): CPU {p.get('cpu_percent', 0.0):.1f}% | RAM {p.get('mem_mb', 0.0):.0f} MB")
         sys_text.append("  *  ".join(proc_snippets), style="dim")
     else:
         sys_text.append("No background AI agent processes currently active.", style="dim")

@@ -54,7 +54,9 @@ def count_skills_and_plugins(agent_key: str = "antigravity") -> Dict[str, int]:
 
     result = {
         "skills": skill_cnt,
-        "plugins": plugin_cnt
+        "plugins": plugin_cnt,
+        "skills_count": skill_cnt,
+        "plugins_count": plugin_cnt
     }
 
     _SKILLS_CACHE[cache_key] = result

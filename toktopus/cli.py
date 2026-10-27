@@ -17,7 +17,7 @@ from toktopus.ui.theme import THEME_CONFIG
 from toktopus.ui.layout import build_dashboard
 from toktopus.adapters import KEY_MAP, get_adapter, auto_detect_active_agent
 from toktopus.core.system import get_system_telemetry
-from toktopus.core.keyboard import get_pressed_key
+from toktopus.core.keyboard import get_pressed_key, init_keyboard, restore_keyboard
 from toktopus.core.pricing import PRICING_TABLE, calculate_costs
 from toktopus.core.benchmarks import get_benchmarks, get_benchmarks_last_updated
 from toktopus.core.limits import normalize_plan_key, get_next_plan, estimate_account_limits
@@ -62,9 +62,14 @@ def export_telemetry_snapshot(export_path: str, telemetry: dict, sys_metrics: di
     in_tok = telemetry.get("input_tokens", 0)
     out_tok = telemetry.get("output_tokens", 0)
     cache_tok = telemetry.get("cache_read_tokens", 0)
+    reason_tok = telemetry.get("reasoning_tokens", 0)
     current_ctx = telemetry.get("current_context_tokens", 0)
 
-    costs = calculate_costs(in_tok, out_tok, cache_tok, pricing_key)
+    costs = calculate_costs(in_tok, out_tok + reason_tok, cache_tok, pricing_key)
+    agent_cost = telemetry.get("session_cost", 0.0)
+    if agent_cost > 0:
+        costs["cost_spent_usd"] = agent_cost
+
     limits = estimate_account_limits(
         agent_key,
         recent_tokens=current_ctx if current_ctx > 0 else (in_tok + out_tok),
@@ -88,7 +93,8 @@ def export_telemetry_snapshot(export_path: str, telemetry: dict, sys_metrics: di
             "input": in_tok,
             "output": out_tok,
             "cache_read": cache_tok,
-            "total_session": telemetry.get("total_tokens", in_tok + out_tok + cache_tok),
+            "reasoning": reason_tok,
+            "total_session": telemetry.get("total_tokens", in_tok + out_tok + cache_tok + reason_tok),
             "cache_efficiency_pct": telemetry.get("cache_efficiency", 0.0),
             "tokens_per_step": telemetry.get("tokens_per_step", 0),
             "tokens_per_sec": telemetry.get("tokens_per_sec", 0)
@@ -201,11 +207,13 @@ def main():
             active_agent_key,
             PRICING_KEYS[current_pricing_idx],
             plan_tier_key=plan_tier,
-            show_full_benchmarks=False
+            show_full_benchmarks=False,
+            console_height=console.size.height
         )
         console.print(dashboard)
         sys.exit(0)
 
+    init_keyboard()
     try:
         with Live(console=console, screen=True, auto_refresh=False) as live:
             last_refresh = 0.0
@@ -247,7 +255,8 @@ def main():
                         active_agent_key,
                         PRICING_KEYS[current_pricing_idx],
                         plan_tier_key=plan_tier,
-                        show_full_benchmarks=show_full_benchmarks
+                        show_full_benchmarks=show_full_benchmarks,
+                        console_height=console.size.height
                     )
                     live.update(dashboard, refresh=True)
                     last_refresh = now
@@ -256,6 +265,7 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        restore_keyboard()
         console.print("[bold #00f3ff]:: toktopus monitor stopped. Goodbye! ::[/bold #00f3ff]")
 
 if __name__ == "__main__":

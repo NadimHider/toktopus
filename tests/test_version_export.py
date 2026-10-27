@@ -7,7 +7,7 @@ from toktopus.cli import export_telemetry_snapshot
 
 class TestVersionAndExport(unittest.TestCase):
     def test_version_string(self):
-        self.assertEqual(toktopus.__version__, "1.2.0")
+        self.assertEqual(toktopus.__version__, "1.3.0")
 
     def test_export_telemetry_snapshot(self):
         sample_telemetry = {
@@ -42,10 +42,11 @@ class TestVersionAndExport(unittest.TestCase):
             self.assertTrue(os.path.exists(tmp_path))
             with open(tmp_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            self.assertEqual(data["version"], "1.2.0")
+            self.assertEqual(data["version"], "1.3.0")
             self.assertEqual(data["agent"]["key"], "antigravity")
             self.assertEqual(data["tokens"]["input"], 1000)
             self.assertEqual(data["tokens"]["output"], 500)
+            self.assertIn("reasoning", data["tokens"])
             self.assertIn("billing", data)
             self.assertIn("account_limits", data)
             self.assertIn("system", data)

@@ -17,16 +17,17 @@ toktopus is a personal hobby project I built to monitor token usage, active cont
 ## Features
 
 * Active Context Tracking: Shows memory load for the current prompt turn against model boundaries (like the 2M token window on Google AI Pro Plan) without mixing in past turn totals.
+* Reasoning Token Breakdown: Captures thinking and reasoning tokens across DeepSeek R1/V4, Mimo, and Gemini Thinking models without discarding them from output totals.
 * Context Utilization Warnings: Triggers an in-terminal alert whenever active context usage reaches 85% or higher so you can compact the session before hitting boundaries.
 * Session Elapsed Timer: Displays how long your current agent session has been active directly in the header bar.
 * Live Account Rate Limits: Monitors tokens per minute (TPM) and requests per minute (RPM) against your plan limits to avoid 429 rate limit errors.
-* Prompt Cache Analytics: Calculates cache hit percentages and estimated cost savings from reused prompt tokens.
+* Prompt Cache Analytics: Distinguishes between cache creation and cache reads, calculating accurate hit percentages and estimated cost savings.
 * Projected Hourly Burn: Computes your live token burn rate and projects session costs per hour based on current activity.
-* Agent Process & System Telemetry: Checks local language servers and background agent processes without slowing down the terminal UI, including optional GPU VRAM and utilization metrics.
+* Agent Process & System Telemetry: Checks background agent processes and hardware metrics without slowing down the terminal UI, including optional GPU VRAM and utilization metrics.
 * Real Skills & Plugin Inventory: Dynamically counts your installed skills and plugins directly from the filesystem with a cached disk scanner.
 * Frontier Model Benchmarks: Displays weekly-calibrated Coding ELO, SWE-bench Verified, and throughput metrics for current frontier models.
 * Telemetry Export: Export instantaneous session snapshots as clean JSON files for scripting, CI runs, or usage auditing.
-* Agent Switching: Switch between Antigravity, Claude Code, OpenCode, Cursor, and Codex on the fly using number hotkeys.
+* Agent Switching: Switch between Antigravity, Claude Code, OpenCode, Cursor, and Codex on the fly using number hotkeys or via the `--agent` command-line flag.
 
 ---
 
@@ -34,7 +35,7 @@ toktopus is a personal hobby project I built to monitor token usage, active cont
 
 ```text
 +-----------------------------------------------------------------------------+
-| :: TOKTOPUS v1.2.0 :: Universal AI Agent Monitor  [Agent: Antigravity 2.0]   |
+| :: TOKTOPUS v1.3.0 :: Universal AI Agent Monitor  [Agent: Antigravity 2.0]   |
 +-----------------------------------------------------------------------------+
 | [CONTEXT WINDOW & ACCOUNT LIMITS]     | [TOKEN VELOCITY & STEP BURNS]       |
 | Model & Plan:    Gemini 3.8 Flash     | Session Volume:  2,302,020 total    |

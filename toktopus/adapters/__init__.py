@@ -1,6 +1,6 @@
 import time
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from toktopus.adapters.base import BaseAgentAdapter
 from toktopus.adapters.antigravity import AntigravityAdapter
 from toktopus.adapters.claude import ClaudeCodeAdapter
@@ -28,8 +28,70 @@ KEY_MAP = {
 def get_adapter(name: str) -> BaseAgentAdapter:
     return ADAPTERS.get(name.lower(), ADAPTERS["antigravity"])
 
+def _get_agent_recency(name: str, adapter: BaseAgentAdapter) -> float:
+    try:
+        if name == "antigravity":
+            sid = adapter.get_active_session_id()
+            if sid:
+                ag = adapter  # type: ignore
+                t1 = ag.ag_dir / "brain" / sid / ".system_generated" / "logs" / "transcript.jsonl"
+                if t1.exists():
+                    return t1.stat().st_mtime
+                t2 = ag.ag_dir / "brain" / sid / ".system_generated" / "logs" / "transcript_full.jsonl"
+                if t2.exists():
+                    return t2.stat().st_mtime
+        elif name == "claude":
+            home = Path.home()
+            c_json = home / ".claude.json"
+            mtime = 0.0
+            if c_json.exists():
+                mtime = max(mtime, c_json.stat().st_mtime)
+            files = adapter._scan_recent_log_files()  # type: ignore
+            if files:
+                mtime = max(mtime, files[0].stat().st_mtime)
+            return mtime
+        elif name == "opencode":
+            op = adapter  # type: ignore
+            if op._db_path and op._db_path.exists():
+                return op._db_path.stat().st_mtime
+        elif name == "codex":
+            home = Path.home()
+            rollouts_dir = home / ".codex" / "sessions"
+            if rollouts_dir.exists():
+                files = list(rollouts_dir.rglob("rollout-*.jsonl"))
+                if files:
+                    files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+                    return files[0].stat().st_mtime
+            idx_file = home / ".codex" / "session_index.jsonl"
+            if idx_file.exists():
+                return idx_file.stat().st_mtime
+        elif name == "cursor":
+            home = Path.home()
+            tracking_db = home / ".cursor" / "ai-tracking" / "ai-code-tracking.db"
+            if tracking_db.exists():
+                return tracking_db.stat().st_mtime
+    except Exception:
+        pass
+    return 0.0
+
 def auto_detect_active_agent() -> str:
-    # 1. First check running processes
+    now = time.time()
+    recent_candidates: List[Tuple[str, float]] = []
+
+    for name, adapter in ADAPTERS.items():
+        if adapter.is_detected():
+            mtime = _get_agent_recency(name, adapter)
+            if mtime > 0:
+                recent_candidates.append((name, mtime))
+
+    # 1. Recency first: if an agent had session activity in the last 180 seconds, pick it
+    if recent_candidates:
+        recent_candidates.sort(key=lambda x: x[1], reverse=True)
+        top_name, top_mtime = recent_candidates[0]
+        if (now - top_mtime) < 180:
+            return top_name
+
+    # 2. Check running processes
     sys_telemetry = get_system_telemetry()
     ai_procs = sys_telemetry.get("ai_processes", [])
     for p in ai_procs:
@@ -45,62 +107,8 @@ def auto_detect_active_agent() -> str:
         elif "copilot" in lbl or "codex" in lbl:
             return "codex"
 
-    # 2. Check recent modification times across agent session data
-    home = Path.home()
-    recency_candidates: List[Tuple[str, float]] = []
-
-    # Antigravity
-    ag_brain = home / ".gemini" / "antigravity-cli" / "brain"
-    if ag_brain.exists():
-        try:
-            subdirs = [d for d in ag_brain.iterdir() if d.is_dir() and not d.name.startswith(".")]
-            if subdirs:
-                subdirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
-                recency_candidates.append(("antigravity", subdirs[0].stat().st_mtime))
-        except Exception:
-            pass
-
-    # OpenCode
-    for op_path in [home / ".local" / "share" / "opencode" / "opencode.db", home / ".config" / "opencode"]:
-        if op_path.exists():
-            try:
-                recency_candidates.append(("opencode", op_path.stat().st_mtime))
-                break
-            except Exception:
-                pass
-
-    # Claude Code
-    claude_sessions = home / ".claude" / "sessions"
-    if claude_sessions.exists():
-        try:
-            files = list(claude_sessions.glob("*.json*"))
-            if files:
-                files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
-                recency_candidates.append(("claude", files[0].stat().st_mtime))
-        except Exception:
-            pass
-
-    # Cursor
-    cursor_tracking = home / ".cursor" / "ai-tracking" / "ai-code-tracking.db"
-    if cursor_tracking.exists():
-        try:
-            recency_candidates.append(("cursor", cursor_tracking.stat().st_mtime))
-        except Exception:
-            pass
-
-    # Codex
-    codex_dir = home / ".codex"
-    if codex_dir.exists():
-        try:
-            files = list(codex_dir.glob("*.json*"))
-            if files:
-                files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
-                recency_candidates.append(("codex", files[0].stat().st_mtime))
-        except Exception:
-            pass
-
-    if recency_candidates:
-        recency_candidates.sort(key=lambda x: x[1], reverse=True)
-        return recency_candidates[0][0]
+    # 3. Overall most recent session data
+    if recent_candidates:
+        return recent_candidates[0][0]
 
     return "antigravity"
