@@ -3,8 +3,10 @@ import sys
 import time
 import json
 import argparse
+from typing import Optional
 from rich.console import Console
 from rich.live import Live
+from rich.table import Table
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -18,17 +20,23 @@ from toktopus.ui.layout import build_dashboard
 from toktopus.adapters import KEY_MAP, get_adapter, auto_detect_active_agent
 from toktopus.core.system import get_system_telemetry
 from toktopus.core.keyboard import get_pressed_key, init_keyboard, restore_keyboard
-from toktopus.core.pricing import PRICING_TABLE, calculate_costs
+from toktopus.core.pricing import PRICING_TABLE, calculate_costs, resolve_pricing_model
 from toktopus.core.benchmarks import get_benchmarks, get_benchmarks_last_updated
 from toktopus.core.limits import normalize_plan_key, get_next_plan, estimate_account_limits
 from toktopus.core.config import load_config, save_config
+from toktopus.core.skills import (
+    list_installed_skills,
+    get_skill,
+    modify_skill,
+    copy_skill
+)
+from toktopus.game import run_space_impact
 
 console = Console(theme=THEME_CONFIG)
 
 PRICING_KEYS = list(PRICING_TABLE.keys())
 
 def print_benchmarks_table():
-    from rich.table import Table
     from toktopus.ui.charts import relative_benchmark_bar
 
     updated_date = get_benchmarks_last_updated()
@@ -58,14 +66,48 @@ def print_benchmarks_table():
 
     console.print(table)
 
+def print_skills_table(agent_key: Optional[str] = None):
+    skills = list_installed_skills(agent_key)
+    title_suffix = f" for {agent_key.upper()}" if agent_key else " across all Agents"
+    table = Table(title=f":: TOKTOPUS : Installed Agent Skills Vault ({len(skills)} skills{title_suffix}) ::", border_style="#00ff88")
+    table.add_column("Agent", style="bold #00f3ff", no_wrap=True)
+    table.add_column("Skill Name", style="bold white", no_wrap=True)
+    table.add_column("Description", style="dim")
+    table.add_column("File Size", justify="right", style="white")
+
+    for s in skills:
+        size_str = f"{s['size_bytes']:,} B" if s['size_bytes'] > 0 else "empty"
+        table.add_row(
+            s["agent"],
+            s["name"],
+            s["description"][:65] if s["description"] else "No description",
+            size_str
+        )
+
+    console.print(table)
+
 def export_telemetry_snapshot(export_path: str, telemetry: dict, sys_metrics: dict, agent_key: str, plan_tier: str, pricing_key: str):
     in_tok = telemetry.get("input_tokens", 0)
     out_tok = telemetry.get("output_tokens", 0)
     cache_tok = telemetry.get("cache_read_tokens", 0)
     reason_tok = telemetry.get("reasoning_tokens", 0)
+    cache_write_tok = telemetry.get("cache_creation_tokens", 0) or telemetry.get("cache_write_tokens", 0)
     current_ctx = telemetry.get("current_context_tokens", 0)
+    elapsed_sec = telemetry.get("session_elapsed_sec", 0.0)
+    recent_steps = telemetry.get("recent_steps", [])
 
-    costs = calculate_costs(in_tok, out_tok + reason_tok, cache_tok, pricing_key)
+    effective_pricing = resolve_pricing_model(telemetry.get("model_name"), agent_key, pricing_key)
+    costs = calculate_costs(
+        input_tokens=in_tok,
+        output_tokens=out_tok,
+        cache_read_tokens=cache_tok,
+        model_key=effective_pricing,
+        reasoning_tokens=reason_tok,
+        cache_write_tokens=cache_write_tok,
+        step_count=len(recent_steps) if recent_steps else 1,
+        elapsed_sec=elapsed_sec
+    )
+
     agent_cost = telemetry.get("session_cost", 0.0)
     if agent_cost > 0:
         costs["cost_spent_usd"] = agent_cost
@@ -85,7 +127,7 @@ def export_telemetry_snapshot(export_path: str, telemetry: dict, sys_metrics: di
             "session_id": telemetry.get("session_id", "default"),
             "model_name": telemetry.get("model_name"),
             "is_active": telemetry.get("is_active", False),
-            "session_elapsed_sec": telemetry.get("session_elapsed_sec", 0.0)
+            "session_elapsed_sec": elapsed_sec
         },
         "tokens": {
             "current_context": current_ctx,
@@ -93,6 +135,7 @@ def export_telemetry_snapshot(export_path: str, telemetry: dict, sys_metrics: di
             "input": in_tok,
             "output": out_tok,
             "cache_read": cache_tok,
+            "cache_write": cache_write_tok,
             "reasoning": reason_tok,
             "total_session": telemetry.get("total_tokens", in_tok + out_tok + cache_tok + reason_tok),
             "cache_efficiency_pct": telemetry.get("cache_efficiency", 0.0),
@@ -152,6 +195,49 @@ def main():
         help="Display AI Model Benchmark Index and exit"
     )
     parser.add_argument(
+        "--game", "--space-impact",
+        dest="run_game",
+        action="store_true",
+        help="Play the Space Impact terminal arcade game and exit"
+    )
+    parser.add_argument(
+        "--skills", "--list-skills",
+        dest="list_skills",
+        action="store_true",
+        help="List installed agent skills across coding harnesses and exit"
+    )
+    parser.add_argument(
+        "--get-skill",
+        metavar="NAME",
+        help="Inspect and print the contents of a specific skill"
+    )
+    parser.add_argument(
+        "--modify-skill",
+        metavar="NAME",
+        help="Modify or append instructions to an existing installed skill"
+    )
+    parser.add_argument(
+        "--instruction",
+        metavar="TEXT",
+        help="Instruction content to append or apply when modifying a skill"
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["append", "prepend", "replace"],
+        default="append",
+        help="Modification mode when editing a skill (default: append)"
+    )
+    parser.add_argument(
+        "--copy-skill",
+        metavar="NAME",
+        help="Copy an installed skill to another agent harness"
+    )
+    parser.add_argument(
+        "--to-agent",
+        choices=["antigravity", "claude", "opencode", "cursor", "codex"],
+        help="Target agent harness when copying a skill"
+    )
+    parser.add_argument(
         "--rate", "-r",
         type=float,
         default=float(saved_cfg.get("refresh_rate", 1.0)),
@@ -173,8 +259,60 @@ def main():
     if args.no_color or os.environ.get("NO_COLOR"):
         console.no_color = True
 
+    if args.run_game:
+        run_space_impact(standalone=True)
+        sys.exit(0)
+
     if args.benchmarks:
         print_benchmarks_table()
+        sys.exit(0)
+
+    if args.list_skills:
+        target_agent = None if args.agent == "auto" else args.agent
+        print_skills_table(target_agent)
+        sys.exit(0)
+
+    if args.get_skill:
+        target_agent = None if args.agent == "auto" else args.agent
+        skill_data = get_skill(args.get_skill, target_agent)
+        if skill_data:
+            console.print(f"[bold #00f3ff]:: SKILL: {skill_data['name']} (Agent: {skill_data['agent']}) ::[/bold #00f3ff]")
+            console.print(f"[dim]File: {skill_data['skill_file']}[/dim]")
+            if skill_data.get("description"):
+                console.print(f"[bold #00ff88]Description:[/bold #00ff88] {skill_data['description']}")
+            console.print("\n[bold white]Instructions:[/bold white]")
+            console.print(skill_data["instructions"])
+        else:
+            console.print(f"[bold #ff3366]Error: Skill '{args.get_skill}' not found.[/bold #ff3366]")
+        sys.exit(0)
+
+    if args.modify_skill:
+        if not args.instruction:
+            console.print("[bold #ff3366]Error: Please provide --instruction text to modify the skill.[/bold #ff3366]")
+            sys.exit(1)
+        target_agent = None if args.agent == "auto" else args.agent
+        success = modify_skill(
+            skill_name=args.modify_skill,
+            instruction_delta=args.instruction,
+            agent_key=target_agent,
+            mode=args.mode
+        )
+        if success:
+            console.print(f"[bold #00ff88]:: Successfully modified skill '{args.modify_skill}' (mode: {args.mode}) ::[/bold #00ff88]")
+        else:
+            console.print(f"[bold #ff3366]Error: Failed to modify skill '{args.modify_skill}'. Skill not found.[/bold #ff3366]")
+        sys.exit(0)
+
+    if args.copy_skill:
+        if not args.to_agent:
+            console.print("[bold #ff3366]Error: Please specify target agent harness with --to-agent.[/bold #ff3366]")
+            sys.exit(1)
+        src_agent = "antigravity" if args.agent == "auto" else args.agent
+        success = copy_skill(args.copy_skill, src_agent, args.to_agent)
+        if success:
+            console.print(f"[bold #00ff88]:: Successfully copied skill '{args.copy_skill}' to {args.to_agent} ::[/bold #00ff88]")
+        else:
+            console.print(f"[bold #ff3366]Error: Failed to copy skill '{args.copy_skill}'.[/bold #ff3366]")
         sys.exit(0)
 
     if args.agent == "auto":
@@ -241,6 +379,24 @@ def main():
                 elif key == "b":
                     show_full_benchmarks = not show_full_benchmarks
                     save_config({"show_benchmarks": show_full_benchmarks})
+                    last_refresh = 0.0
+                elif key == "g":
+                    # Launch Space Impact Minigame
+                    restore_keyboard()
+                    run_space_impact(standalone=False)
+                    init_keyboard()
+                    last_refresh = 0.0
+                elif key == "s":
+                    # Show skills vault summary
+                    restore_keyboard()
+                    console.clear()
+                    print_skills_table(active_agent_key)
+                    console.print("[dim]Press Enter to return to monitor...[/dim]")
+                    try:
+                        input()
+                    except Exception:
+                        pass
+                    init_keyboard()
                     last_refresh = 0.0
                 elif key == "r":
                     last_refresh = 0.0

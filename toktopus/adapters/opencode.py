@@ -211,6 +211,10 @@ class OpenCodeAdapter(BaseAgentAdapter):
                 for m_type, m_seq, m_time, m_data in reversed(msg_rows):
                     tools = []
                     step_tok = 0
+                    in_msg = 0
+                    out_msg = 0
+                    cache_msg = 0
+                    reason_msg = 0
                     if m_data:
                         try:
                             d = json.loads(m_data)
@@ -220,10 +224,14 @@ class OpenCodeAdapter(BaseAgentAdapter):
                             # Extract tokens from message if available
                             usage = d.get("usage") or d.get("tokens") or {}
                             if isinstance(usage, dict):
-                                step_tok = usage.get("total") or (usage.get("input", 0) + usage.get("output", 0))
+                                in_msg = usage.get("input", 0) or usage.get("prompt_tokens", 0)
+                                out_msg = usage.get("output", 0) or usage.get("completion_tokens", 0)
+                                cache_msg = usage.get("cache_read", 0) or usage.get("cached_tokens", 0)
+                                reason_msg = usage.get("reasoning", 0) or usage.get("thinking_tokens", 0)
+                                step_tok = usage.get("total") or (in_msg + out_msg + cache_msg + reason_msg)
                             if step_tok == 0 and "text" in d:
-                                # Estimate rough token count from text length
                                 step_tok = len(d["text"]) // 4
+                                in_msg = step_tok
                         except Exception:
                             pass
 
@@ -233,6 +241,11 @@ class OpenCodeAdapter(BaseAgentAdapter):
                         "type": turn_type,
                         "status": "DONE",
                         "tools": tools,
+                        "input_tokens": in_msg,
+                        "output_tokens": out_msg,
+                        "cache_tokens": cache_msg,
+                        "cache_read_tokens": cache_msg,
+                        "reasoning_tokens": reason_msg,
                         "total_tokens": step_tok
                     })
                     if step_tok > 0:

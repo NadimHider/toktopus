@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "toktopus"
-version = "1.3.0"
+version = "1.4.0"
 description = "Real-time Terminal Activity and Token Monitor for AI Coding Agents (Antigravity, Claude Code, OpenCode, Cursor, Codex)"
 readme = "README.md"
 authors = [{ name = "Nadim Hider", email = "nadim.hider@outlook.com" }]

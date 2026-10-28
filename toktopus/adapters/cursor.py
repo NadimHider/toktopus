@@ -156,11 +156,17 @@ class CursorAdapter(BaseAgentAdapter):
                         in_t = data.get("promptTokens") or data.get("inputTokens") or 0
                         out_t = data.get("completionTokens") or data.get("outputTokens") or 0
                         c_t = data.get("cachedTokens") or 0
+                        if in_t == 0 and out_t == 0:
+                            sugg_lines = data.get("composerSuggestedLines") or 0
+                            if sugg_lines > 0:
+                                out_t = sugg_lines * 12
+                                in_t = out_t * 3
                         if in_t > 0 or out_t > 0:
                             total_in = in_t
                             total_out = out_t
                             total_cache = c_t
                             active_context = total_in + total_cache
+                            step_burns = [min(4000, (in_t + out_t) // 4)] * 4
                     except Exception:
                         pass
 

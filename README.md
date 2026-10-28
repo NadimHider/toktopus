@@ -17,12 +17,14 @@ toktopus is a personal hobby project I built to monitor token usage, active cont
 ## Features
 
 * Active Context Tracking: Shows memory load for the current prompt turn against model boundaries (like the 2M token window on Google AI Pro Plan) without mixing in past turn totals.
+* Dedicated Session Billing & Model Pricing: Displays live input, output, and cache rates per 1M tokens, calculates cumulative session spend vs spend without caching, per-step cost, hourly burn rate velocity, and projected 1k turn expenses.
+* Dedicated Cache Hit Efficiency & Prompt Leverage: Real-time cache ratio gauge with optimal/efficient badges, turn-by-turn braille sparkline, token composition bar, and prompt leverage multiplier tracking how many tokens you avoided paying full price for.
+* Retro Space Impact Terminal Arcade Game: Play a retro space shooter directly in your terminal with spaceship controls, lasers, scout aliens, interceptors, heavy fighters, asteroids, boss waves, HP bar, and scoring.
+* Cross-Agent Skill Modifier: Inspect, edit, append, prepend, replace, or copy skills across Antigravity, Claude Code, OpenCode, Cursor, and Codex with automatic YAML frontmatter preservation and backup protection.
 * Reasoning Token Breakdown: Captures thinking and reasoning tokens across DeepSeek R1/V4, Mimo, and Gemini Thinking models without discarding them from output totals.
 * Context Utilization Warnings: Triggers an in-terminal alert whenever active context usage reaches 85% or higher so you can compact the session before hitting boundaries.
 * Session Elapsed Timer: Displays how long your current agent session has been active directly in the header bar.
 * Live Account Rate Limits: Monitors tokens per minute (TPM) and requests per minute (RPM) against your plan limits to avoid 429 rate limit errors.
-* Prompt Cache Analytics: Distinguishes between cache creation and cache reads, calculating accurate hit percentages and estimated cost savings.
-* Projected Hourly Burn: Computes your live token burn rate and projects session costs per hour based on current activity.
 * Agent Process & System Telemetry: Checks background agent processes and hardware metrics without slowing down the terminal UI, including optional GPU VRAM and utilization metrics.
 * Real Skills & Plugin Inventory: Dynamically counts your installed skills and plugins directly from the filesystem with a cached disk scanner.
 * Frontier Model Benchmarks: Displays weekly-calibrated Coding ELO, SWE-bench Verified, and throughput metrics for current frontier models.
@@ -35,34 +37,32 @@ toktopus is a personal hobby project I built to monitor token usage, active cont
 
 ```text
 +-----------------------------------------------------------------------------+
-| :: TOKTOPUS v1.3.0 :: Universal AI Agent Monitor  [Agent: Antigravity 2.0]   |
+| :: TOKTOPUS v1.4.0 :: Universal AI Agent Monitor  [Agent: Antigravity 2.0]   |
 +-----------------------------------------------------------------------------+
-| [CONTEXT WINDOW & ACCOUNT LIMITS]     | [TOKEN VELOCITY & STEP BURNS]       |
-| Model & Plan:    Gemini 3.8 Flash     | Session Volume:  2,302,020 total    |
-|                  Google AI Pro Plan   | Composition:     [==========--------|
-| Active Context:  4.2% (83k / 2,000k)  | Breakdown:       C: 2.0M In: 205k   |
-| Minute Limit:    2.1% [SAFE] (4.0M)   | Velocity:        20,193 tok/step    |
-| Cache Ratio:     90.9% [OPTIMAL]      | Sparkline:       ..........         |
-| Session Billing: $0.1240 val | Saved  | Proj Burn:       $0.45/hr           |
+| [CONTEXT WINDOW & ACCOUNT LIMITS]     | [CACHE HIT EFFICIENCY & LEVERAGE]   |
+| Model & Plan:    Gemini 3.8 Flash     | Cache Ratio:     96.2% [OPTIMAL]    |
+|                  Google AI Pro Plan   | Turn Trendline:  ......             |
+| Active Context:  4.4% (87k / 2,000k)  | Composition:     [==========-----]  |
+| Minute Limit:    2.1% [SAFE] (4.0M)   | Leverage:        26.1x multiplier   |
+| Request Rate:    12 / 360 rpm         | Cache Saved:     $8.40 (70.6% off)  |
 +-----------------------------------------------------------------------------+
-| [LIVE AI BENCHMARK INDEX] (Weekly Verified : 2026-10-25)                    |
-| Rank   Model Name           Coding ELO   SWE-bench   HumanEval   Throughput |
-| #1     GPT 6.1              1540         84.6%       98.4%       115 tok/s  |
-| #2     Claude 5.5           1535         83.9%       98.1%       95 tok/s   |
-| #3     DeepSeek R4.1 Flash  1495         78.4%       96.5%       240 tok/s  |
-| #4     Gemini 3.8 Flash     1480         76.2%       95.8%       185 tok/s  |
-| #5     Claude 3.7 Sonnet    1402         70.3%       94.8%       74 tok/s   |
+| [SESSION BILLING & MODEL PRICING]     | [TOKEN VELOCITY & STEP BURNS]       |
+| Pricing Model:   Gemini 3.8 Flash     | Session Volume:  119,699,377 total  |
+| Model Rates:     In: $0.10 | Out:     | Composition:     Cache / In / Out   |
+|                  $0.40 | Cache: $0.025| Breakdown:       C: 114M In: 4.5M   |
+| Cumulative Cost: $3.5035              | Velocity:        87,505 tok/step    |
+| Velocity & Proj: $0.029/step | $42/1k | Sparkline:       ..........         |
 +-----------------------------------------------------------------------------+
 | [SUB-AGENTS & SKILLS VAULT]           | [REAL-TIME AGENT STEP TRANSCRIPT]   |
-| * research            [ACTIVE]        | #111 [PLANNER_RESPONSE] 83,200 tok  |
-| * team-lead           [IDLE]          | #112 [TOOL_CALL] bash  2,400 tok    |
-| Installed Skills: 378 | Plugins: 115  | #113 [PLANNER_RESPONSE] 1,120 tok   |
+| Skills Vault: 488 skills | 115 plugins| #1828 [PLANNER_RESP] 87k (97% cache)|
+| * research            [ACTIVE]        | #1829 [TOOL_CALL] bash 2,400 tok    |
+| * team-lead           [IDLE]          | #1830 [PLANNER_RESP] 88k (97% cache)|
 +-----------------------------------------------------------------------------+
 | [SYSTEM LOAD & PROCESS TELEMETRY]                                           |
 | Host CPU: [====--------] 14.2%  |  Host RAM: [========----] 12.4 / 32.0 GB  |
 | Active Processes: Antigravity Language Server (PID 2140): CPU 1.2%          |
 +-----------------------------------------------------------------------------+
-| [1] Antigravity [2] Claude [3] OpenCode [4] Cursor [5] Codex | [Q] Quit    |
+| [1] Antigravity [2] Claude [3] OpenCode [4] Cursor [5] Codex | [G] Game [Q] |
 +-----------------------------------------------------------------------------+
 ```
 
@@ -105,6 +105,14 @@ toktopus
 | `--once` | | Output a single snapshot and exit (useful for scripts) |
 | `--export <path>` | `-e` | Export current telemetry snapshot as JSON to file and exit |
 | `--benchmarks` | `-b` | Display benchmark leaderboard table and exit |
+| `--game`, `--space-impact` | | Launch the retro Space Impact terminal arcade game and exit |
+| `--skills`, `--list-skills` | | List installed agent skills across coding harnesses and exit |
+| `--get-skill <name>` | | Inspect and print the contents of a specific skill |
+| `--modify-skill <name>` | | Modify or append instructions to an existing installed skill |
+| `--instruction <text>` | | Instruction content to append or apply when modifying a skill |
+| `--mode <mode>` | | Modification mode: `append`, `prepend`, or `replace` (default: append) |
+| `--copy-skill <name>` | | Copy an installed skill to another agent harness |
+| `--to-agent <agent>` | | Target agent harness when copying a skill (`antigravity`, `claude`, `opencode`, etc.) |
 | `--rate <sec>` | `-r` | Refresh interval in seconds (default: 1.0) |
 | `--no-color` | | Disable color styling (also respects NO_COLOR env var) |
 | `--version` | `-v` | Display version information |
@@ -123,10 +131,54 @@ toktopus
 | `P` or `T` | Cycle plan tier (Google AI Pro Plan, Pay-As-You-Go, Free Tier, etc.) |
 | `M` | Cycle pricing models to compare theoretical token costs |
 | `B` | Toggle expanded benchmark table |
+| `G` | Launch retro Space Impact arcade game from the monitor |
+| `S` | Open installed skills vault summary |
 | `R` | Force an immediate disk rescan and UI refresh |
 | `Q` | Quit back to shell |
 
 Preferences are saved to `~/.config/toktopus/config.json`.
+
+---
+
+## Retro Space Impact Game
+
+toktopus v1.4.0 includes an arcade space shooter built directly into the terminal. Play it while waiting for long agent runs or debugging sessions:
+
+```bash
+toktopus --game
+```
+
+Or press `G` from inside the live monitoring dashboard.
+
+Controls:
+* `W` / `A` / `S` / `D` or Arrow Keys: Maneuver ship
+* `Space`: Fire laser cannon
+* `P`: Pause game
+* `Q` or `Esc`: Exit back to monitor or terminal
+* `R`: Restart game upon game over
+
+---
+
+## Cross-Agent Skill Management
+
+Inspect, modify, and migrate skills across any installed agent harness:
+
+```bash
+# List all installed skills across all harnesses
+toktopus --skills
+
+# Inspect instructions and metadata for a specific skill
+toktopus --get-skill workflow-patterns
+
+# Append new instructions to an existing skill (creates automatic .bak backup)
+toktopus --modify-skill workflow-patterns --instruction "Always run tests before completing."
+
+# Replace a skill entirely
+toktopus --modify-skill custom-linter --instruction "Run ruff check ." --mode replace
+
+# Copy a skill from Antigravity to Claude Code
+toktopus --copy-skill workflow-patterns --to-agent claude
+```
 
 ---
 

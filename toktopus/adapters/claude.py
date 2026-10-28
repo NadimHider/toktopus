@@ -117,6 +117,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
         total_out = 0
         total_cache_read = 0
         total_cache_create = 0
+        total_reasoning = 0
         active_context = 0
         is_active = False
         last_modified = 0.0
@@ -179,6 +180,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
                     file_out = 0
                     file_c_read = 0
                     file_c_create = 0
+                    file_reasoning = 0
 
                     with open(target_file, "r", encoding="utf-8", errors="ignore") as f:
                         for idx, line in enumerate(f):
@@ -187,24 +189,27 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
                                 continue
                             try:
                                 d = json.loads(line)
-                                in_t = d.get("input_tokens") or d.get("prompt_tokens") or 0
-                                out_t = d.get("output_tokens") or d.get("completion_tokens") or 0
-                                c_read = d.get("cache_read_input_tokens") or d.get("cache_read_tokens") or 0
-                                c_create = d.get("cache_creation_input_tokens") or 0
+                                usage = d.get("usage") or d.get("message", {}).get("usage") or {}
+                                in_t = d.get("input_tokens") or d.get("prompt_tokens") or usage.get("input_tokens") or usage.get("prompt_tokens") or 0
+                                out_t = d.get("output_tokens") or d.get("completion_tokens") or usage.get("output_tokens") or usage.get("completion_tokens") or 0
+                                c_read = d.get("cache_read_input_tokens") or d.get("cache_read_tokens") or usage.get("cache_read_input_tokens") or usage.get("cache_read_tokens") or 0
+                                c_create = d.get("cache_creation_input_tokens") or usage.get("cache_creation_input_tokens") or 0
+                                reason_t = d.get("thinking_tokens") or usage.get("thinking_tokens") or 0
 
                                 file_in += in_t
                                 file_out += out_t
                                 file_c_read += c_read
                                 file_c_create += c_create
+                                file_reasoning += reason_t
 
-                                turn_tok = in_t + out_t + c_read + c_create
+                                turn_tok = in_t + out_t + c_read + c_create + reason_t
                                 if turn_tok > 0:
                                     step_burns.append(turn_tok)
 
                                 if in_t > 0 or (c_read + c_create) > 0:
                                     active_context = in_t + c_read + c_create
 
-                                m = d.get("model")
+                                m = d.get("model") or d.get("message", {}).get("model")
                                 if m:
                                     model_name = str(m)
 
@@ -224,6 +229,12 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
                                     "type": d.get("type", "TURN").upper(),
                                     "status": "DONE",
                                     "tools": tools if isinstance(tools, list) else [str(tools)],
+                                    "input_tokens": in_t,
+                                    "output_tokens": out_t,
+                                    "cache_tokens": c_read,
+                                    "cache_read_tokens": c_read,
+                                    "cache_creation_tokens": c_create,
+                                    "reasoning_tokens": reason_t,
                                     "total_tokens": turn_tok
                                 })
                             except Exception:
@@ -234,6 +245,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
                         total_out = file_out
                         total_cache_read = file_c_read
                         total_cache_create = file_c_create
+                        total_reasoning = file_reasoning
 
                 elif target_file.suffix == ".json":
                     with open(target_file, "r", encoding="utf-8", errors="ignore") as f:
@@ -258,7 +270,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
         total_cache = total_cache_read + total_cache_create
         denom = total_in + total_cache_read
         cache_eff = round((total_cache_read / denom) * 100, 1) if denom > 0 else 0.0
-        total_tokens = total_in + total_out + total_cache
+        total_tokens = total_in + total_out + total_cache + total_reasoning
         avg_tokens_per_step = int(total_tokens / len(recent_steps)) if recent_steps else 0
 
         # Real throughput calculation
@@ -284,6 +296,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
             "output_tokens": total_out,
             "cache_read_tokens": total_cache_read,
             "cache_creation_tokens": total_cache_create,
+            "reasoning_tokens": total_reasoning,
             "total_tokens": total_tokens,
             "cache_efficiency": cache_eff,
             "tokens_per_step": avg_tokens_per_step,

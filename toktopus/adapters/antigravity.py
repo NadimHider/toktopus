@@ -66,6 +66,39 @@ class AntigravityAdapter(BaseAgentAdapter):
         if not self.ag_dir.exists():
             self.ag_dir = self._find_ag_dir()
 
+        # 1. Try querying conversation_summaries.db for active sessions matching cwd
+        db_path = self.ag_dir / "conversation_summaries.db"
+        if db_path.exists():
+            conn = None
+            try:
+                uri = f"file:{db_path.as_posix()}?mode=ro"
+                conn = sqlite3.connect(uri, uri=True, timeout=1.0)
+                cur = conn.cursor()
+                cwd = os.getcwd().replace("\\", "/").rstrip("/").lower()
+                cur.execute("SELECT conversation_id, workspace_uris FROM conversation_summaries WHERE killed = 0 ORDER BY last_modified_time DESC LIMIT 20;")
+                rows = cur.fetchall()
+                for cid, uris in rows:
+                    if uris and cwd in uris.replace("\\", "/").lower():
+                        self._cached_session_id = str(cid)
+                        self._last_session_check = now
+                        return self._cached_session_id
+
+                # Match by not_fully_idle
+                cur.execute("SELECT conversation_id FROM conversation_summaries WHERE not_fully_idle = 1 AND killed = 0 ORDER BY last_modified_time DESC LIMIT 1;")
+                r = cur.fetchone()
+                if r and r[0]:
+                    self._cached_session_id = str(r[0])
+                    self._last_session_check = now
+                    return self._cached_session_id
+            except Exception:
+                pass
+            finally:
+                if conn:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+
         brain_dir = self.ag_dir / "brain"
         if not brain_dir.exists():
             return None
@@ -354,10 +387,15 @@ class AntigravityAdapter(BaseAgentAdapter):
             uri = f"file:{db_path.as_posix()}?mode=ro"
             conn = sqlite3.connect(uri, uri=True, timeout=1.0)
             cur = conn.cursor()
-            cur.execute("SELECT title FROM conversation_summaries WHERE conversation_id = ?", (conv_id,))
+            cur.execute("SELECT title, preview FROM conversation_summaries WHERE conversation_id = ?", (conv_id,))
             row = cur.fetchone()
-            if row and row[0]:
-                return row[0].strip()
+            if row:
+                if row[0] and row[0].strip():
+                    return row[0].strip()
+                if len(row) > 1 and row[1] and row[1].strip():
+                    first_line = row[1].strip().splitlines()[0].strip()
+                    if first_line:
+                        return first_line[:35]
         except Exception:
             pass
         finally:

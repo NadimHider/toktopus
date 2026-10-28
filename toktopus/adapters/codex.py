@@ -232,7 +232,8 @@ class CodexAdapter(BaseAgentAdapter):
                                     in_t = last_usage.get("input_tokens", 0)
                                     out_t = last_usage.get("output_tokens", 0)
                                     c_t = last_usage.get("cached_input_tokens", 0)
-                                    turn_tok = in_t + out_t + c_t
+                                    r_t = last_usage.get("reasoning_output_tokens", 0)
+                                    turn_tok = in_t + out_t + c_t + r_t
                                     if turn_tok > 0:
                                         step_burns.append(turn_tok)
                                     active_context = in_t + c_t
@@ -246,6 +247,10 @@ class CodexAdapter(BaseAgentAdapter):
                                         "type": "TOOL_CALL",
                                         "status": "DONE",
                                         "tools": [name],
+                                        "input_tokens": in_t if 'in_t' in locals() else 0,
+                                        "output_tokens": out_t if 'out_t' in locals() else 0,
+                                        "cache_tokens": c_t if 'c_t' in locals() else 0,
+                                        "reasoning_tokens": r_t if 'r_t' in locals() else 0,
                                         "total_tokens": step_burns[-1] if step_burns else 0
                                     })
                         except Exception:

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict, Any
 
 BRAILLE_LEVELS = [" ", "⡀", "⣀", "⠤", "⠶", "⠒", "⠊", "⠉", "⠑"]
 
@@ -8,7 +8,7 @@ def braille_sparkline(data: List[int], max_width: int = 28) -> str:
 
     points = data[-max_width:]
     mn, mx = min(points), max(points)
-    
+
     if mn == mx:
         return "⠤" * len(points)
 
@@ -53,6 +53,84 @@ def quota_gauge(used: int, limit: int, width: int = 16) -> str:
         color = "#ffe600"
 
     return f"[{color}]{'█' * filled}[/{color}][dim]{'░' * empty}[/dim] {pct * 100:.1f}%"
+
+def cache_efficiency_gauge(efficiency_pct: float, width: int = 20) -> str:
+    clamped = min(100.0, max(0.0, efficiency_pct))
+    pct = clamped / 100.0
+    filled = int(pct * width)
+    empty = width - filled
+
+    if clamped >= 80.0:
+        color = "#00ff88"
+        badge = "OPTIMAL"
+    elif clamped >= 60.0:
+        color = "#00f3ff"
+        badge = "EFFICIENT"
+    elif clamped >= 35.0:
+        color = "#ffe600"
+        badge = "MODERATE"
+    else:
+        color = "#ff3366"
+        badge = "COLD"
+
+    bar = f"[{color}]{'█' * filled}[/{color}][dim]{'░' * empty}[/dim]"
+    return f"{bar} [{color}]{clamped:.1f}% [{badge}][/{color}]"
+
+def efficiency_status_badge(efficiency_pct: float) -> str:
+    if efficiency_pct >= 85.0:
+        return "[bold #00ff88][ELITE CACHE][/bold #00ff88]"
+    elif efficiency_pct >= 60.0:
+        return "[bold #00f3ff][OPTIMAL][/bold #00f3ff]"
+    elif efficiency_pct >= 35.0:
+        return "[bold #ffe600][MODERATE][/bold #ffe600]"
+    return "[bold #ff3366][COLD MISS][/bold #ff3366]"
+
+def cache_split_bar(cached_tokens: int, fresh_tokens: int, width: int = 24) -> str:
+    total = cached_tokens + fresh_tokens
+    if total <= 0:
+        return f"[dim][{'░' * width}][/dim]"
+
+    cached_len = int((cached_tokens / total) * width)
+    fresh_len = width - cached_len
+
+    return (
+        f"[#00ff88]{'█' * cached_len}[/#00ff88]"
+        f"[#00f3ff]{'█' * fresh_len}[/#00f3ff]"
+    )
+
+def cache_trend_sparkline(recent_steps: List[Dict[str, Any]], max_width: int = 20) -> str:
+    if not recent_steps:
+        return "⠤" * min(5, max_width)
+
+    eff_points = []
+    for s in recent_steps[-max_width:]:
+        c_tok = s.get("cache_tokens") or s.get("cache_read_tokens") or 0
+        in_tok = s.get("input_tokens") or 0
+        tot = c_tok + in_tok
+        if tot > 0:
+            eff = int((c_tok / tot) * 100)
+        else:
+            eff = 0
+        eff_points.append(eff)
+
+    if not eff_points:
+        return "⠤" * min(5, max_width)
+
+    return braille_sparkline(eff_points, max_width=len(eff_points))
+
+def cost_burn_bar(cost_usd: float, max_budget_usd: float = 10.0, width: int = 16) -> str:
+    budget = max(0.01, max_budget_usd)
+    pct = min(1.0, max(0.0, cost_usd / budget))
+    filled = int(pct * width)
+    empty = width - filled
+
+    color = "#00ff88"
+    if pct > 0.80:
+        color = "#ff3366"
+    elif pct > 0.50:
+        color = "#ffe600"
+
+    return f"[{color}]{'█' * filled}[/{color}][dim]{'░' * empty}[/dim]"
 
 def stacked_token_ratio_bar(cache_tokens: int, input_tokens: int, output_tokens: int, width: int = 30) -> str:
     total = cache_tokens + input_tokens + output_tokens
