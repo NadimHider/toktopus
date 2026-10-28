@@ -12,7 +12,8 @@ AI_PROCESS_NAMES = {
     "cursor": "Cursor Agent Process",
     "cursor-agent": "Cursor Background Agent",
     "copilot": "GitHub Copilot Agent",
-    "codex": "OpenAI Codex Process"
+    "codex": "OpenAI Codex Process",
+    "pi": "Pi Coding Agent"
 }
 
 _CACHED_PROCESSES: List[Dict[str, Any]] = []
@@ -124,14 +125,80 @@ def get_system_telemetry() -> Dict[str, Any]:
     used_ram_gb = round(mem.used / (1024 ** 3), 1)
     ram_percent = mem.percent or 0.0
 
+    # Extended CPU metrics
+    cpu_freq_mhz = 0.0
+    try:
+        freq = psutil.cpu_freq()
+        if freq and freq.current:
+            cpu_freq_mhz = round(freq.current, 1)
+    except Exception:
+        pass
+
+    cpu_cores_logical = 1
+    cpu_cores_physical = 1
+    try:
+        cpu_cores_logical = psutil.cpu_count(logical=True) or 1
+        cpu_cores_physical = psutil.cpu_count(logical=False) or cpu_cores_logical
+    except Exception:
+        pass
+
+    # Extended Swap memory metrics
+    swap_used_gb = 0.0
+    swap_total_gb = 0.0
+    swap_percent = 0.0
+    try:
+        swap = psutil.swap_memory()
+        swap_used_gb = round(swap.used / (1024 ** 3), 1)
+        swap_total_gb = round(swap.total / (1024 ** 3), 1)
+        swap_percent = swap.percent or 0.0
+    except Exception:
+        pass
+
+    # Extended Disk storage metrics
+    disk_used_gb = 0.0
+    disk_total_gb = 0.0
+    disk_free_gb = 0.0
+    disk_percent = 0.0
+    try:
+        root_path = os.path.splitdrive(os.getcwd())[0] + "\\" if os.name == "nt" else "/"
+        disk = psutil.disk_usage(root_path)
+        disk_used_gb = round(disk.used / (1024 ** 3), 1)
+        disk_total_gb = round(disk.total / (1024 ** 3), 1)
+        disk_free_gb = round(disk.free / (1024 ** 3), 1)
+        disk_percent = disk.percent or 0.0
+    except Exception:
+        pass
+
+    # Extended Network I/O metrics
+    net_sent_mb = 0.0
+    net_recv_mb = 0.0
+    try:
+        net = psutil.net_io_counters()
+        net_sent_mb = round(net.bytes_sent / (1024 ** 2), 1)
+        net_recv_mb = round(net.bytes_recv / (1024 ** 2), 1)
+    except Exception:
+        pass
+
     total_ai_cpu = sum(p.get("cpu_percent", 0.0) or 0.0 for p in _CACHED_PROCESSES)
     total_ai_mem_mb = sum(p.get("mem_mb", 0.0) or 0.0 for p in _CACHED_PROCESSES)
 
     return {
         "host_cpu_percent": cpu_percent,
+        "cpu_freq_mhz": cpu_freq_mhz,
+        "cpu_cores_logical": cpu_cores_logical,
+        "cpu_cores_physical": cpu_cores_physical,
         "host_ram_used_gb": used_ram_gb,
         "host_ram_total_gb": total_ram_gb,
         "host_ram_percent": ram_percent,
+        "swap_used_gb": swap_used_gb,
+        "swap_total_gb": swap_total_gb,
+        "swap_percent": swap_percent,
+        "disk_used_gb": disk_used_gb,
+        "disk_total_gb": disk_total_gb,
+        "disk_free_gb": disk_free_gb,
+        "disk_percent": disk_percent,
+        "net_sent_mb": net_sent_mb,
+        "net_recv_mb": net_recv_mb,
         "ai_processes": _CACHED_PROCESSES[:6],
         "total_ai_cpu": round(total_ai_cpu, 1),
         "total_ai_mem_mb": round(total_ai_mem_mb, 1),

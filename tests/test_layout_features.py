@@ -93,5 +93,52 @@ class TestLayoutFeatures(unittest.TestCase):
         narrow_layout = build_dashboard(telemetry, sys_metrics, "antigravity", "gemini-3.8-flash", console_width=85)
         self.assertIsNotNone(narrow_layout)
 
+    def test_skills_expanded_and_collapsed(self):
+        telemetry = {
+            "agent_name": "Pi Agent",
+            "session_id": "pi-test",
+            "model_name": "Pi-3.5 Coding",
+            "current_context_tokens": 10000,
+            "max_context_tokens": 128000,
+            "input_tokens": 5000,
+            "output_tokens": 1000,
+            "cache_read_tokens": 15000,
+            "total_tokens": 21000,
+            "cache_efficiency": 75.0,
+            "tokens_per_step": 3000,
+            "tokens_per_sec": 50,
+            "recent_steps_tokens": [1000, 2000],
+            "recent_steps": [],
+            "active_subagents": []
+        }
+        sys_metrics = {
+            "host_cpu_percent": 15.0,
+            "cpu_freq_mhz": 3400.0,
+            "cpu_cores_logical": 8,
+            "cpu_cores_physical": 4,
+            "host_ram_used_gb": 8.0,
+            "host_ram_total_gb": 32.0,
+            "host_ram_percent": 25.0,
+            "swap_used_gb": 0.5,
+            "swap_total_gb": 8.0,
+            "swap_percent": 6.2,
+            "disk_used_gb": 200.0,
+            "disk_total_gb": 500.0,
+            "disk_free_gb": 300.0,
+            "disk_percent": 40.0,
+            "net_sent_mb": 150.0,
+            "net_recv_mb": 450.0,
+            "ai_processes": [],
+            "gpu": None
+        }
+
+        # Collapsed mode
+        dash_collapsed = build_dashboard(telemetry, sys_metrics, "pi", "gemini-3.8-flash", show_skills_expanded=False)
+        self.assertIsNotNone(dash_collapsed)
+
+        # Expanded mode
+        dash_expanded = build_dashboard(telemetry, sys_metrics, "pi", "gemini-3.8-flash", show_skills_expanded=True)
+        self.assertIsNotNone(dash_expanded)
+
 if __name__ == "__main__":
     unittest.main()

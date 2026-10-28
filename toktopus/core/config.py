@@ -45,6 +45,7 @@ def get_default_plan_for_agent(agent_key: str) -> str:
         "claude": "claude-pro",
         "opencode": "opencode-zen",
         "cursor": "cursor-pro",
-        "codex": "codex-pro"
+        "codex": "codex-pro",
+        "pi": "pi-pro"
     }
     return defaults.get(agent_key, "google-ai-pro")

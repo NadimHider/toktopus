@@ -8,67 +8,76 @@ from rich import box
 
 OCTO_FRAMES = {
     "idle_1": [
-        r"   .---.   ",
-        r"  / o o \  ",
-        r" (|  v  |) ",
-        r"  /~\_/~\  ",
-        r" (~)   (~) "
+        r"  .-------.  ",
+        r" /  o   o  \ ",
+        r"(|    v    |)",
+        r" /| \___/ |\ ",
+        r"(~\ /~\ /~/ )",
+        r" \~'   '~/   "
     ],
     "idle_2": [
-        r"   .---.   ",
-        r"  / - - \  ",
-        r" (|  ~  |) ",
-        r"  \~_/~_   ",
-        r"  (~) (~)  "
+        r"  .-------.  ",
+        r" /  -   -  \ ",
+        r"(|    ~    |)",
+        r" /| \___/ |\ ",
+        r"(~\ /~\ /~/ )",
+        r"  \~' '~/    "
     ],
     "coding_1": [
-        r"   .---.   ",
-        r"  / >O< \  ",
-        r" (|  W  |) ",
-        r"  \~/~\~/  ",
-        r"  /~\ /~\  "
+        r"  .-------.  ",
+        r" /  >   <  \ ",
+        r"(|   ===   |)",
+        r" /|\/~~~\/|\ ",
+        r"(~\~/   \~/~)",
+        r" \~'     '~/ "
     ],
     "coding_2": [
-        r"   .---.   ",
-        r"  / @.@ \  ",
-        r" (|  O  |) ",
-        r"  /~\~/~\  ",
-        r"  \~/ \~/  "
+        r"  .-------.  ",
+        r" /  @   @  \ ",
+        r"(|   ~~~   |)",
+        r" /|\/~~~\/|\ ",
+        r"(~\~/   \~/~)",
+        r"  \~'   '~/  "
     ],
     "cache_high": [
-        r"   .---.   ",
-        r"  / B ) \  ",
-        r" (|  -  |) ",
-        r"  /~\_/~\  ",
-        r" (~)   (~) "
+        r"  .-------.  ",
+        r" /  B ) ( B \ ",
+        r"(|    ▽    |)",
+        r" /| \___/ |\ ",
+        r"(~\ /~\ /~/ )",
+        r" \~'     '~/ "
     ],
     "pet": [
-        r"   .---.   ",
-        r"  / ^.^ \  ",
-        r" (|  3  |) ",
-        r"  \~v~/~   ",
-        r"  (~) (~)  "
+        r"  .-------.  ",
+        r" /  ^   ^  \ ",
+        r"(|   <3    |)",
+        r" /| \___/ |\ ",
+        r"(~\ /~\ /~/ )",
+        r"  \~' '~/    "
     ],
     "eating": [
-        r"   .---.   ",
-        r"  / ^w^ \  ",
-        r" (|  C  |) ",
-        r"  \~/~\~/  ",
-        r"  (~) (~)  "
+        r"  .-------.  ",
+        r" /  ^   ^  \ ",
+        r"(|    w    |)",
+        r" /|\/~~~\/|\ ",
+        r"(~\~/ * \~/~)",
+        r" \~'     '~/ "
     ],
     "sleeping": [
-        r"   .---.   ",
-        r"  / - - \  ",
-        r" (|  o  |) ",
-        r"  \_____/  ",
-        r"  (~) (~)  "
+        r"  .-------. z",
+        r" /  -   -  \z",
+        r"(|    o    |)",
+        r" /| \___/ |\ ",
+        r"(~\ /~\ /~/ )",
+        r" \~'     '~/ "
     ],
     "hungry": [
-        r"   .---.   ",
-        r"  / . . \  ",
-        r" (|  ~  |) ",
-        r"  /~\_/~\  ",
-        r"  ( ) ( )  "
+        r"  .-------.  ",
+        r" /  .   .  \ ",
+        r"(|    ~    |)",
+        r" /| \___/ |\ ",
+        r"( )  ( ) ( ) ",
+        r"  '       '  "
     ]
 }
 
@@ -242,8 +251,10 @@ class CyberPet:
             empty = length - filled
             return f"[{color}]{'█' * filled}[/{color}][dim]{'░' * empty}[/dim] {val}%"
 
-        fuel_gauge = _mini_bar(self.fuel, 100, length=7, color="#ffe600" if self.fuel < 35 else "#00ff88")
-        joy_gauge = _mini_bar(self.happiness, 100, length=7, color="#ff3366" if self.happiness < 35 else "#00f3ff")
+        fuel_gauge = _mini_bar(self.fuel, 100, length=6, color="#ffe600" if self.fuel < 35 else "#00ff88")
+        joy_gauge = _mini_bar(self.happiness, 100, length=6, color="#ff3366" if self.happiness < 35 else "#00f3ff")
+        needed_xp = self.level * 100
+        xp_gauge = _mini_bar(self.xp, needed_xp, length=6, color="#b026ff")
 
         # Layout inside pet box
         content = Table.grid(padding=(0, 1), expand=True)
@@ -255,13 +266,14 @@ class CyberPet:
         colored_sprite = [f"[{color_tag}]{line}[/{color_tag}]" for line in sprite]
 
         # Info lines on right side
-        quip_text = self.current_quip[:36]
+        quip_text = self.current_quip[:32]
         info_lines = [
             f"[bold white]{self.name}[/bold white] [dim](Lv.{self.level})[/dim] [{mood_color}][{mood_name}][/{mood_color}]",
-            f"[dim]Thought:[/dim] [#00ff88]\"{quip_text}\"[/#00ff88]",
+            f"[dim]XP  :[/dim] {xp_gauge}",
             f"[dim]Fuel:[/dim] {fuel_gauge}",
             f"[dim]Joy :[/dim] {joy_gauge}",
-            f"[bold #00f3ff][F][/bold #00f3ff][dim] Feed Token  [/dim][bold #ff3366][T][/bold #ff3366][dim] Pet[/dim]"
+            f"[#00ff88]\"{quip_text}\"[/#00ff88]",
+            f"[bold #00f3ff][F][/bold #00f3ff][dim]Feed [/dim][bold #ff3366][T][/bold #ff3366][dim]Pet [/dim][bold #ffe600][O][/bold #ffe600][dim]Lounge[/dim]"
         ]
 
         # Combine rows

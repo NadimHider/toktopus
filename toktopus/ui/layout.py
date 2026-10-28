@@ -14,15 +14,22 @@ from toktopus.ui.charts import (
     mini_cpu_gauge,
     relative_benchmark_bar,
     cache_efficiency_gauge,
+    large_cache_gauge,
     cache_split_bar,
     cache_trend_sparkline,
     cost_burn_bar,
-    format_metric_number
+    format_metric_number,
+    token_composition_tank,
+    system_resource_bar
 )
 from toktopus.core.pricing import calculate_costs, resolve_pricing_model
 from toktopus.core.benchmarks import get_benchmarks, get_benchmarks_last_updated
 from toktopus.core.limits import estimate_account_limits
-from toktopus.core.skills import count_skills_and_plugins
+from toktopus.core.skills import (
+    count_skills_and_plugins,
+    get_all_agents_skill_summary,
+    list_installed_skills
+)
 from toktopus.core.pet import get_cyber_pet
 
 def _format_duration(seconds: float) -> str:
@@ -45,6 +52,7 @@ def build_dashboard(
     pricing_model_key: str,
     plan_tier_key: str = "google-ai-pro",
     show_full_benchmarks: bool = False,
+    show_skills_expanded: bool = False,
     console_height: Optional[int] = None,
     console_width: Optional[int] = None
 ) -> Layout:
@@ -53,26 +61,35 @@ def build_dashboard(
     h = console_height or 44
     w = console_width or 120
 
-    if h < 34:
-        top_size = 8
-        mid_size = 7
-        low_size = 7
-        sys_size = 5
-    elif h < 40:
-        top_size = 9
-        mid_size = 8
-        low_size = 8
-        sys_size = 5
+    if show_skills_expanded:
+        skills_size = 9 if h >= 40 else (8 if h >= 35 else 6)
+        top_size = 8 if h >= 40 else 7
+        mid_size = 8 if h >= 40 else 7
+        low_size = 5 if h >= 40 else 4
+        sys_size = 6 if h >= 40 else 5
     else:
-        top_size = 10
-        mid_size = 9
-        low_size = 8
-        sys_size = 5
+        skills_size = 3
+        if h < 34:
+            top_size = 8
+            mid_size = 7
+            low_size = 6
+            sys_size = 5
+        elif h < 40:
+            top_size = 9
+            mid_size = 8
+            low_size = 7
+            sys_size = 6
+        else:
+            top_size = 10
+            mid_size = 9
+            low_size = 8
+            sys_size = 6
 
     layout.split_column(
         Layout(name="header", size=3),
         Layout(name="top_row", size=top_size),
         Layout(name="middle_row", size=mid_size),
+        Layout(name="skills_row", size=skills_size),
         Layout(name="lower_row", size=low_size),
         Layout(name="system_row", size=sys_size),
         Layout(name="footer", size=3)
@@ -207,10 +224,10 @@ def build_dashboard(
 
     cache_table.add_row(
         "[bold white]Cache Ratio:[/bold white]",
-        cache_efficiency_gauge(cache_eff, width=14)
+        large_cache_gauge(cache_eff, width=16)
     )
 
-    trend_spark = cache_trend_sparkline(recent_steps, max_width=16)
+    trend_spark = cache_trend_sparkline(recent_steps, max_width=18)
     cache_table.add_row(
         "[bold white]Turn Trend:[/bold white]",
         f"[#00ff88]{trend_spark}[/#00ff88] [dim](cache hit % by turn)[/dim]"
@@ -218,7 +235,7 @@ def build_dashboard(
 
     cache_table.add_row(
         "[bold white]Composition:[/bold white]",
-        f"{cache_split_bar(cache_tok, in_tok, width=16)} [dim]C: {format_metric_number(cache_tok)} | In: {format_metric_number(in_tok)}[/dim]"
+        f"{cache_split_bar(cache_tok, in_tok, width=18)} [dim]C: {format_metric_number(cache_tok)} | In: {format_metric_number(in_tok)}[/dim]"
     )
 
     total_prompt = in_tok + cache_tok
@@ -306,7 +323,7 @@ def build_dashboard(
     )
     velocity_table.add_row(
         "[bold white]Composition:[/bold white]",
-        f"{stacked_token_ratio_bar(cache_tok, in_tok, out_tok + reason_tok, width=20)} [dim]Cache / In / Out[/dim]"
+        f"{token_composition_tank(cache_tok, in_tok, out_tok, reason_tok, width=22)} [dim]C / In / Out / R[/dim]"
     )
     velocity_table.add_row(
         "[bold white]Breakdown:[/bold white]",
@@ -326,7 +343,56 @@ def build_dashboard(
     )
 
     # =========================================================================
-    # LOWER ROW: Full Benchmarks OR Subagents/Skills + Transcript
+    # SKILLS ROW: Collapsible / Expandable Skill Vault Underneath Stats
+    # =========================================================================
+    if show_skills_expanded:
+        skills_list = list_installed_skills(active_agent_key)
+        if not skills_list:
+            skills_list = list_installed_skills()
+
+        sk_table = Table(box=None, expand=True, pad_edge=False)
+        sk_table.add_column("Agent", style="bold #00f3ff", no_wrap=True)
+        sk_table.add_column("Skill Name", style="bold white", no_wrap=True)
+        sk_table.add_column("Description", style="dim")
+        sk_table.add_column("Size", justify="right", style="#00ff88")
+
+        max_show = 5 if h >= 40 else 4
+        for s in skills_list[:max_show]:
+            size_kb = f"{s['size_bytes'] / 1024:.1f} KB" if s.get('size_bytes') else "0 KB"
+            desc = s.get('description', '')[:50] or "No description"
+            sk_table.add_row(s['agent'], s['name'], desc, size_kb)
+
+        sub_msg = f"Showing {min(max_show, len(skills_list))} of {len(skills_list)} skills. [E] Edit skill  |  [S] Collapse vault"
+        layout["skills_row"].update(
+            Panel(sk_table, title=f"[bold #00ff88][SKILLS VAULT : {active_agent_key.upper()} (EXPANDED)][/bold #00ff88]", subtitle=f"[dim]{sub_msg}[/dim]", border_style="#00ff88", box=box.ROUNDED)
+        )
+    else:
+        all_skill_counts = get_all_agents_skill_summary()
+        cur_skills = count_skills_and_plugins(active_agent_key)
+        cur_sk = cur_skills.get("skills", 0)
+
+        sk_text = Text()
+        sk_text.append("Antigravity: ", style="bold white")
+        sk_text.append(f"{all_skill_counts.get('antigravity', {}).get('skills', 0)} sk  |  ", style="#00ff88")
+        sk_text.append("Claude: ", style="bold white")
+        sk_text.append(f"{all_skill_counts.get('claude', {}).get('skills', 0)} sk  |  ", style="#00ff88")
+        sk_text.append("OpenCode: ", style="bold white")
+        sk_text.append(f"{all_skill_counts.get('opencode', {}).get('skills', 0)} sk  |  ", style="#00ff88")
+        sk_text.append("Cursor: ", style="bold white")
+        sk_text.append(f"{all_skill_counts.get('cursor', {}).get('skills', 0)} sk  |  ", style="#00ff88")
+        sk_text.append("Codex: ", style="bold white")
+        sk_text.append(f"{all_skill_counts.get('codex', {}).get('skills', 0)} sk  |  ", style="#00ff88")
+        sk_text.append("Pi: ", style="bold white")
+        sk_text.append(f"{all_skill_counts.get('pi', {}).get('skills', 0)} sk", style="#00ff88")
+
+        sk_text.append(f"\n[Press 'S' to Expand/Inspect  |  'E' to Edit Skill]  -- Active: {agent_name} ({cur_sk} skills installed)", style="dim")
+
+        layout["skills_row"].update(
+            Panel(sk_text, title="[bold #00ff88][SKILLS VAULT : CROSS-AGENT OVERVIEW (COLLAPSED)][/bold #00ff88]", border_style="#00ff88", box=box.ROUNDED, padding=(0, 1))
+        )
+
+    # =========================================================================
+    # LOWER ROW: Full Benchmarks OR Real-Time Step Transcript
     # =========================================================================
     if show_full_benchmarks:
         bench_table = Table(box=None, expand=True, pad_edge=False)
@@ -359,50 +425,26 @@ def build_dashboard(
             Panel(bench_table, title=f"[bold #ffe600][LIVE AI BENCHMARK INDEX][/bold #ffe600] [dim](Weekly Verified : {last_updated_str})[/dim]", border_style="#ffe600", box=box.ROUNDED)
         )
     else:
-        if show_pet_in_top:
+        subagents = telemetry.get("active_subagents", [])
+        if subagents and w >= 110:
             layout["lower_row"].split_row(
                 Layout(name="subagents_box", ratio=1),
-                Layout(name="transcript_box", ratio=2)
+                Layout(name="transcript_box", ratio=3)
             )
 
             sub_table = Table.grid(padding=(0, 1), expand=True)
-            skills_data = count_skills_and_plugins(active_agent_key)
-            skills_count = skills_data.get("skills", skills_data.get("skills_count", 0))
-            plugins_count = skills_data.get("plugins", skills_data.get("plugins_count", 0))
-
-            sub_table.add_row(
-                "[bold white]Skills Vault:[/bold white]",
-                f"[bold #00ff88]{skills_count}[/bold #00ff88] skills [dim]|[/dim] [bold #00f3ff]{plugins_count}[/bold #00f3ff] plugins"
-            )
-            sub_table.add_row(
-                "[dim]Management:[/dim]",
-                "[dim]Press [S] to inspect, modify, or copy skills[/dim]"
-            )
-
-            subagents = telemetry.get("active_subagents", [])
-            if subagents:
-                for sa in subagents[:2]:
-                    st_color = "#00ff88" if sa.get("status") == "ACTIVE" else "dim"
-                    sub_table.add_row(
-                        f"[bold white]{sa.get('name', 'subagent')}[/bold white]",
-                        f"[{st_color}]{sa.get('status', 'IDLE')}[/{st_color}]"
-                    )
-            else:
+            for sa in subagents[:3]:
+                st_color = "#00ff88" if sa.get("status") == "ACTIVE" else "dim"
                 sub_table.add_row(
-                    "[dim]Subagents:[/dim]",
-                    "[dim]No auxiliary subagents currently spawned[/dim]"
+                    f"[bold white]{sa.get('name', 'subagent')[:14]}[/bold white]",
+                    f"[{st_color}]{sa.get('status', 'IDLE')}[/{st_color}]"
                 )
-
             layout["lower_row"]["subagents_box"].update(
-                Panel(sub_table, title="[bold #00ff88][SUB-AGENTS & SKILLS VAULT][/bold #00ff88]", border_style="#00ff88", box=box.ROUNDED, padding=(0, 1))
+                Panel(sub_table, title="[bold #00ff88][SUBAGENTS][/bold #00ff88]", border_style="#00ff88", box=box.ROUNDED, padding=(0, 1))
             )
+            target_transcript = layout["lower_row"]["transcript_box"]
         else:
-            # On narrow terminals, lower row shows Pet on left and Transcript on right
-            layout["lower_row"].split_row(
-                Layout(name="pet_box", ratio=1),
-                Layout(name="transcript_box", ratio=1)
-            )
-            layout["lower_row"]["pet_box"].update(pet.render_widget())
+            target_transcript = layout["lower_row"]
 
         step_table = Table.grid(padding=(0, 1), expand=True)
         if recent_steps:
@@ -414,7 +456,7 @@ def build_dashboard(
                 step_table.add_row(
                     f"[bold #00f3ff]#{stp.get('index', 0)}[/bold #00f3ff]",
                     f"[white][{stp.get('type', 'STEP')}][/white]",
-                    f"[dim]{tools_str[:28]}[/dim]",
+                    f"[dim]{tools_str[:34]}[/dim]",
                     f"[#ffe600]{format_metric_number(t_tok)} tok[/#ffe600] [dim]{step_eff}[/dim]"
                 )
         else:
@@ -423,43 +465,59 @@ def build_dashboard(
                 "[dim]Waiting for next agent prompt/response turn...[/dim]"
             )
 
-        layout["lower_row"]["transcript_box"].update(
+        target_transcript.update(
             Panel(step_table, title="[bold white][REAL-TIME AGENT STEP TRANSCRIPT][/bold white]", border_style="dim", box=box.ROUNDED, padding=(0, 1))
         )
 
     # =========================================================================
-    # SYSTEM ROW: Host CPU, RAM, GPU, Processes
+    # SYSTEM ROW: Extended System Hardware & Process Telemetry
     # =========================================================================
     host_cpu = sys_metrics.get("host_cpu_percent") or 0.0
+    cpu_freq = sys_metrics.get("cpu_freq_mhz") or 0.0
+    cores_p = sys_metrics.get("cpu_cores_physical") or 1
+    cores_l = sys_metrics.get("cpu_cores_logical") or 1
     host_ram_used = sys_metrics.get("host_ram_used_gb") or 0.0
     host_ram_total = sys_metrics.get("host_ram_total_gb") or 32.0
     host_ram_pct = sys_metrics.get("host_ram_percent") or 0.0
+    swap_used = sys_metrics.get("swap_used_gb") or 0.0
+    swap_total = sys_metrics.get("swap_total_gb") or 0.0
+    swap_pct = sys_metrics.get("swap_percent") or 0.0
+    disk_used = sys_metrics.get("disk_used_gb") or 0.0
+    disk_total = sys_metrics.get("disk_total_gb") or 0.0
+    disk_free = sys_metrics.get("disk_free_gb") or 0.0
+    disk_pct = sys_metrics.get("disk_percent") or 0.0
+    net_sent = sys_metrics.get("net_sent_mb") or 0.0
+    net_recv = sys_metrics.get("net_recv_mb") or 0.0
     ai_procs = sys_metrics.get("ai_processes", [])
     gpu_data = sys_metrics.get("gpu")
 
     sys_text = Text()
-    sys_text.append(f"Host CPU: [{mini_cpu_gauge(host_cpu)}] {host_cpu:.1f}%  |  ", style="white")
-    sys_text.append(f"Host RAM: [{mini_cpu_gauge(host_ram_pct)}] {host_ram_used:.1f} / {host_ram_total:.1f} GB ({host_ram_pct:.1f}%)", style="white")
+    freq_str = f" @ {cpu_freq:.0f}MHz" if cpu_freq > 0 else ""
+    sys_text.append(f"Host CPU: [{mini_cpu_gauge(host_cpu, 8)}] {host_cpu:.1f}%{freq_str} ({cores_p}P/{cores_l}L)  |  ", style="white")
+    sys_text.append(f"RAM: [{mini_cpu_gauge(host_ram_pct, 8)}] {host_ram_used:.1f}/{host_ram_total:.1f}GB ({host_ram_pct:.1f}%)  |  ", style="white")
+    sys_text.append(f"Swap: [{mini_cpu_gauge(swap_pct, 6)}] {swap_used:.1f}/{swap_total:.1f}GB", style="white")
 
+    gpu_str = ""
     if gpu_data:
         gpu_util = gpu_data.get("gpu_util_percent") or 0.0
         vram_used = (gpu_data.get("vram_used_mb") or 0.0) / 1024.0
         vram_total = (gpu_data.get("vram_total_mb") or 0.0) / 1024.0
         gpu_name = gpu_data.get("gpu_name") or "GPU"
-        sys_text.append(f"  |  {gpu_name}: [{mini_cpu_gauge(gpu_util)}] {gpu_util:.0f}% ({vram_used:.1f}/{vram_total:.1f} GB VRAM)", style="bold #ffe600")
+        gpu_str = f"  |  {gpu_name}: [{mini_cpu_gauge(gpu_util, 6)}] {gpu_util:.0f}% ({vram_used:.1f}/{vram_total:.1f}GB)"
+
+    sys_text.append(f"\nDisk: [{mini_cpu_gauge(disk_pct, 8)}] {disk_used:.1f}/{disk_total:.1f}GB ({disk_pct:.1f}%) [Free {disk_free:.1f}GB]  |  Net: Up {net_sent:.1f}MB / Down {net_recv:.1f}MB{gpu_str}", style="white")
 
     sys_text.append("\nActive AI Processes: ", style="bold #00f3ff")
-
     if ai_procs:
         proc_snippets = []
-        for p in ai_procs[:3]:
-            proc_snippets.append(f"{p['label']} (PID {p['pid']}): CPU {p.get('cpu_percent', 0.0):.1f}% | RAM {p.get('mem_mb', 0.0):.0f} MB")
+        for p in ai_procs[:4]:
+            proc_snippets.append(f"{p['label']} (PID {p['pid']}): CPU {p.get('cpu_percent', 0.0):.1f}% | RAM {p.get('mem_mb', 0.0):.0f}MB")
         sys_text.append("  *  ".join(proc_snippets), style="dim")
     else:
         sys_text.append("No background AI agent processes currently active.", style="dim")
 
     layout["system_row"].update(
-        Panel(sys_text, title="[bold #00f3ff][SYSTEM LOAD & PROCESS TELEMETRY][/bold #00f3ff]", border_style="#00f3ff", box=box.ROUNDED, padding=(0, 1))
+        Panel(sys_text, title="[bold #00f3ff][EXTENDED SYSTEM HARDWARE & PROCESS TELEMETRY][/bold #00f3ff]", border_style="#00f3ff", box=box.ROUNDED, padding=(0, 1))
     )
 
     # =========================================================================
@@ -471,7 +529,8 @@ def build_dashboard(
     footer_text.append(" [3] OpenCode ", style="bold #00ff88" if active_agent_key == "opencode" else "dim")
     footer_text.append(" [4] Cursor ", style="bold #00ff88" if active_agent_key == "cursor" else "dim")
     footer_text.append(" [5] Codex ", style="bold #00ff88" if active_agent_key == "codex" else "dim")
-    footer_text.append(f" | [P] Plan  [M] Model  [B] Benchmarks  [G] Space Impact  [O] Pet Lounge  [F] Feed  [T] Pet  [S] Skills  [Q] Quit", style="bold white")
+    footer_text.append(" [6] Pi Agent ", style="bold #00ff88" if active_agent_key == "pi" else "dim")
+    footer_text.append(f" | [P] Plan  [M] Model  [B] Benchmarks  [S] Skills  [E] Edit Skill  [G] Space Impact  [O] Pet Lounge  [F] Feed  [T] Pet  [Q] Quit", style="bold white")
 
     layout["footer"].update(Panel(footer_text, border_style="dim", box=box.ROUNDED))
 

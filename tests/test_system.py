@@ -11,6 +11,21 @@ class TestSystem(unittest.TestCase):
         self.assertIn("gpu", sys_data)
         self.assertGreaterEqual(sys_data["host_ram_total_gb"], 1.0)
 
+        # Extended telemetry fields
+        self.assertIn("cpu_freq_mhz", sys_data)
+        self.assertIn("cpu_cores_logical", sys_data)
+        self.assertIn("cpu_cores_physical", sys_data)
+        self.assertIn("swap_used_gb", sys_data)
+        self.assertIn("swap_total_gb", sys_data)
+        self.assertIn("swap_percent", sys_data)
+        self.assertIn("disk_used_gb", sys_data)
+        self.assertIn("disk_total_gb", sys_data)
+        self.assertIn("disk_free_gb", sys_data)
+        self.assertIn("disk_percent", sys_data)
+        self.assertIn("net_sent_mb", sys_data)
+        self.assertIn("net_recv_mb", sys_data)
+        self.assertGreaterEqual(sys_data["cpu_cores_logical"], 1)
+
     def test_gpu_scan_safe_execution(self):
         # Should execute safely and return None or valid GPU dict
         gpu_result = _scan_gpu_telemetry()

@@ -88,6 +88,28 @@ TIER_LIMITS: Dict[str, Dict[str, Any]] = {
         "monthly_allowance_usd": 19.00,
         "is_subscription": True,
         "description": "GitHub Copilot and OpenAI Codex developer plan"
+    },
+    "pi-pro": {
+        "tier_name": "Pi Agent Pro",
+        "plan_badge": "[PI PRO]",
+        "max_context": 128_000,
+        "max_rpm": 200,
+        "max_tpm": 1_000_000,
+        "max_rpd": 15_000,
+        "monthly_allowance_usd": 20.00,
+        "is_subscription": True,
+        "description": "Inflection Pi Coding Agent Pro Subscription"
+    },
+    "pi-standard": {
+        "tier_name": "Pi Agent Standard",
+        "plan_badge": "[PI TIER]",
+        "max_context": 64_000,
+        "max_rpm": 60,
+        "max_tpm": 400_000,
+        "max_rpd": 5_000,
+        "monthly_allowance_usd": 0.00,
+        "is_subscription": False,
+        "description": "Inflection Pi Free / Standard Community Tier"
     }
 }
 
@@ -110,7 +132,10 @@ PLAN_ALIASES: Dict[str, str] = {
     "cursor-pro": "cursor-pro",
     "codex": "codex-pro",
     "codex-pro": "codex-pro",
-    "copilot": "codex-pro"
+    "copilot": "codex-pro",
+    "pi": "pi-pro",
+    "pi-pro": "pi-pro",
+    "pi-standard": "pi-standard"
 }
 
 AGENT_PLAN_CYCLE: Dict[str, List[str]] = {
@@ -118,7 +143,8 @@ AGENT_PLAN_CYCLE: Dict[str, List[str]] = {
     "claude": ["claude-pro", "claude-tier2"],
     "opencode": ["opencode-zen", "google-ai-pro"],
     "cursor": ["cursor-pro", "claude-pro"],
-    "codex": ["codex-pro", "claude-pro"]
+    "codex": ["codex-pro", "claude-pro"],
+    "pi": ["pi-pro", "pi-standard"]
 }
 
 def normalize_plan_key(raw_key: str, agent_key: str = "antigravity") -> str:
@@ -133,9 +159,14 @@ def normalize_plan_key(raw_key: str, agent_key: str = "antigravity") -> str:
         "claude": "claude-pro",
         "opencode": "opencode-zen",
         "cursor": "cursor-pro",
-        "codex": "codex-pro"
+        "codex": "codex-pro",
+        "pi": "pi-pro"
     }
     return fallback_map.get(agent_key, "google-ai-pro")
+
+def auto_detect_plan(agent_key: str) -> str:
+    ak = (agent_key or "antigravity").lower()
+    return normalize_plan_key(ak, ak)
 
 def get_next_plan(current_plan: str, agent_key: str = "antigravity") -> str:
     cycle = AGENT_PLAN_CYCLE.get(agent_key, list(TIER_LIMITS.keys()))

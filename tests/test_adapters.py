@@ -10,10 +10,11 @@ from toktopus.adapters.claude import ClaudeCodeAdapter
 from toktopus.adapters.opencode import OpenCodeAdapter
 from toktopus.adapters.cursor import CursorAdapter
 from toktopus.adapters.codex import CodexAdapter
+from toktopus.adapters.pi import PiAgentAdapter
 
 class TestAdapters(unittest.TestCase):
     def test_all_adapters_registered(self):
-        for name in ["antigravity", "claude", "opencode", "cursor", "codex"]:
+        for name in ["antigravity", "claude", "opencode", "cursor", "codex", "pi"]:
             self.assertIn(name, ADAPTERS)
             adapter = get_adapter(name)
             self.assertIsNotNone(adapter)
@@ -236,7 +237,41 @@ class TestAdapters(unittest.TestCase):
 
     def test_auto_detect_active_agent(self):
         agent = auto_detect_active_agent()
-        self.assertIn(agent, ["antigravity", "claude", "opencode", "cursor", "codex"])
+        self.assertIn(agent, ["antigravity", "claude", "opencode", "cursor", "codex", "pi"])
+
+    def test_pi_adapter_parsing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pi_dir = Path(tmpdir) / ".pi"
+            pi_dir.mkdir(parents=True)
+            sess_file = pi_dir / "session.json"
+            conf_file = pi_dir / "config.json"
+
+            with open(sess_file, "w", encoding="utf-8") as f:
+                json.dump({
+                    "session_id": "pi-test-sess-99",
+                    "model": "pi-3.5-coding-pro",
+                    "input_tokens": 12000,
+                    "output_tokens": 3000,
+                    "cached_tokens": 45000,
+                    "reasoning_tokens": 1200
+                }, f)
+
+            with open(conf_file, "w", encoding="utf-8") as f:
+                json.dump({"model": "pi-3.5-coding-pro"}, f)
+
+            pi_adapter = PiAgentAdapter()
+            pi_adapter.pi_dirs = [pi_dir]
+            self.assertTrue(pi_adapter.is_detected())
+            self.assertEqual(pi_adapter.get_active_session_id(), "pi-test-sess-99")
+
+            t = pi_adapter.get_session_telemetry()
+            self.assertEqual(t["agent_name"], "Pi Agent")
+            self.assertEqual(t["model_name"], "pi-3.5-coding-pro")
+            self.assertEqual(t["input_tokens"], 12000)
+            self.assertEqual(t["output_tokens"], 3000)
+            self.assertEqual(t["cache_read_tokens"], 45000)
+            self.assertEqual(t["reasoning_tokens"], 1200)
+            self.assertEqual(t["total_tokens"], 12000 + 3000 + 45000 + 1200)
 
 if __name__ == "__main__":
     unittest.main()

@@ -171,6 +171,64 @@ def mini_cpu_gauge(percent: float, width: int = 12) -> str:
 
     return f"[{color}]{'█' * filled}[/{color}][dim]{'░' * empty}[/dim]"
 
+def large_cache_gauge(efficiency_pct: float, width: int = 28) -> str:
+    clamped = min(100.0, max(0.0, efficiency_pct))
+    pct = clamped / 100.0
+    filled = int(pct * width)
+    empty = width - filled
+
+    if clamped >= 85.0:
+        color = "#00ff88"
+        badge = "ELITE"
+    elif clamped >= 60.0:
+        color = "#00f3ff"
+        badge = "OPTIMAL"
+    elif clamped >= 35.0:
+        color = "#ffe600"
+        badge = "MODERATE"
+    else:
+        color = "#ff3366"
+        badge = "COLD"
+
+    bar = f"[{color}]{'█' * filled}[/{color}][dim]{'░' * empty}[/dim]"
+    return f"{bar} [{color}]{clamped:.1f}% [{badge}][/{color}]"
+
+def token_composition_tank(
+    cache_tokens: int,
+    input_tokens: int,
+    output_tokens: int,
+    reasoning_tokens: int = 0,
+    width: int = 32
+) -> str:
+    total = cache_tokens + input_tokens + output_tokens + reasoning_tokens
+    if total <= 0:
+        return f"[dim][{'░' * width}][/dim]"
+
+    c_len = int((cache_tokens / total) * width)
+    in_len = int((input_tokens / total) * width)
+    out_len = int((output_tokens / total) * width)
+    reason_len = max(0, width - c_len - in_len - out_len)
+
+    return (
+        f"[#00ff88]{'█' * c_len}[/#00ff88]"
+        f"[#00f3ff]{'█' * in_len}[/#00f3ff]"
+        f"[#b026ff]{'█' * out_len}[/#b026ff]"
+        f"[#ffe600]{'█' * reason_len}[/#ffe600]"
+    )
+
+def system_resource_bar(used: float, total: float, width: int = 12) -> str:
+    if total <= 0:
+        return f"[dim][{'░' * width}][/dim]"
+    pct = min(1.0, max(0.0, used / total))
+    filled = int(pct * width)
+    empty = width - filled
+    color = "#00ff88"
+    if pct > 0.85:
+        color = "#ff3366"
+    elif pct > 0.65:
+        color = "#ffe600"
+    return f"[{color}]{'█' * filled}[/{color}][dim]{'░' * empty}[/dim]"
+
 def relative_benchmark_bar(score: float, max_score: float = 1600.0, width: int = 12) -> str:
     pct = min(1.0, max(0.0, score / max_score))
     filled = int(pct * width)

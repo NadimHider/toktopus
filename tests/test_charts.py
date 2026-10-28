@@ -10,7 +10,10 @@ from toktopus.ui.charts import (
     cache_split_bar,
     cache_trend_sparkline,
     cost_burn_bar,
-    format_metric_number
+    format_metric_number,
+    large_cache_gauge,
+    token_composition_tank,
+    system_resource_bar
 )
 
 class TestCharts(unittest.TestCase):
@@ -85,6 +88,23 @@ class TestCharts(unittest.TestCase):
 
     def test_cost_burn_bar(self):
         bar = cost_burn_bar(cost_usd=2.50, max_budget_usd=10.0, width=10)
+        self.assertIn("#00ff88", bar)
+
+    def test_large_cache_gauge(self):
+        gauge = large_cache_gauge(88.5, width=20)
+        self.assertIn("88.5%", gauge)
+        self.assertIn("ELITE", gauge)
+        self.assertIn("#00ff88", gauge)
+
+    def test_token_composition_tank(self):
+        tank = token_composition_tank(10000, 5000, 2000, 1000, width=20)
+        self.assertIn("#00ff88", tank)
+        self.assertIn("#00f3ff", tank)
+        self.assertIn("#b026ff", tank)
+        self.assertIn("#ffe600", tank)
+
+    def test_system_resource_bar(self):
+        bar = system_resource_bar(50.0, 100.0, width=10)
         self.assertIn("#00ff88", bar)
 
 if __name__ == "__main__":

@@ -33,6 +33,10 @@ AGENT_SKILL_PATHS: Dict[str, List[Path]] = {
         HOME_DIR / ".cursor" / "extensions",
         Path(os.environ.get("APPDATA", "")) / "Cursor" / "skills" if os.environ.get("APPDATA") else None,
         Path(os.environ.get("APPDATA", "")) / "Cursor" / "User" / "skills" if os.environ.get("APPDATA") else None
+    ],
+    "pi": [
+        HOME_DIR / ".pi" / "skills",
+        HOME_DIR / ".config" / "pi" / "skills"
     ]
 }
 
@@ -83,6 +87,11 @@ def count_skills_and_plugins(agent_key: str = "antigravity") -> Dict[str, int]:
         plugins_dir = home / ".local" / "share" / "opencode" / "plugins"
         skill_cnt = _safe_count_dirs(skills_dir)
         plugin_cnt = _safe_count_dirs(plugins_dir)
+    elif cache_key == "pi":
+        skills_dir = home / ".pi" / "skills"
+        plugins_dir = home / ".config" / "pi" / "plugins"
+        skill_cnt = _safe_count_dirs(skills_dir)
+        plugin_cnt = _safe_count_dirs(plugins_dir)
     else:
         skills_dir = home / ".codex" / "skills"
         plugins_dir = home / ".codex" / "plugins"
@@ -99,6 +108,10 @@ def count_skills_and_plugins(agent_key: str = "antigravity") -> Dict[str, int]:
     _SKILLS_CACHE[cache_key] = result
     _LAST_CHECK_TIME = now
     return result
+
+def get_all_agents_skill_summary() -> Dict[str, Dict[str, int]]:
+    agents = ["antigravity", "claude", "opencode", "cursor", "codex", "pi"]
+    return {ag: count_skills_and_plugins(ag) for ag in agents}
 
 def _parse_frontmatter(content: str) -> tuple[Dict[str, str], str]:
     frontmatter: Dict[str, str] = {}

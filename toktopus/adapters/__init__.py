@@ -7,6 +7,7 @@ from toktopus.adapters.claude import ClaudeCodeAdapter
 from toktopus.adapters.opencode import OpenCodeAdapter
 from toktopus.adapters.cursor import CursorAdapter
 from toktopus.adapters.codex import CodexAdapter
+from toktopus.adapters.pi import PiAgentAdapter
 from toktopus.core.system import get_system_telemetry
 
 ADAPTERS: Dict[str, BaseAgentAdapter] = {
@@ -14,7 +15,8 @@ ADAPTERS: Dict[str, BaseAgentAdapter] = {
     "claude": ClaudeCodeAdapter(),
     "opencode": OpenCodeAdapter(),
     "cursor": CursorAdapter(),
-    "codex": CodexAdapter()
+    "codex": CodexAdapter(),
+    "pi": PiAgentAdapter()
 }
 
 KEY_MAP = {
@@ -22,7 +24,8 @@ KEY_MAP = {
     "2": "claude",
     "3": "opencode",
     "4": "cursor",
-    "5": "codex"
+    "5": "codex",
+    "6": "pi"
 }
 
 def get_adapter(name: str) -> BaseAgentAdapter:
@@ -70,6 +73,11 @@ def _get_agent_recency(name: str, adapter: BaseAgentAdapter) -> float:
             tracking_db = home / ".cursor" / "ai-tracking" / "ai-code-tracking.db"
             if tracking_db.exists():
                 return tracking_db.stat().st_mtime
+        elif name == "pi":
+            home = Path.home()
+            pi_session = home / ".pi" / "session.json"
+            if pi_session.exists():
+                return pi_session.stat().st_mtime
     except Exception:
         pass
     return 0.0

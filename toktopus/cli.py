@@ -22,7 +22,7 @@ from toktopus.core.system import get_system_telemetry
 from toktopus.core.keyboard import get_pressed_key, init_keyboard, restore_keyboard
 from toktopus.core.pricing import PRICING_TABLE, calculate_costs, resolve_pricing_model
 from toktopus.core.benchmarks import get_benchmarks, get_benchmarks_last_updated
-from toktopus.core.limits import normalize_plan_key, get_next_plan, estimate_account_limits
+from toktopus.core.limits import normalize_plan_key, auto_detect_plan, get_next_plan, estimate_account_limits
 from toktopus.core.config import load_config, save_config
 from toktopus.core.skills import (
     list_installed_skills,
@@ -36,6 +36,66 @@ from toktopus.core.pet import get_cyber_pet, run_pet_lounge
 console = Console(theme=THEME_CONFIG)
 
 PRICING_KEYS = list(PRICING_TABLE.keys())
+
+def interactive_edit_skill(active_agent_key: str):
+    console.clear()
+    skills = list_installed_skills(active_agent_key)
+    if not skills:
+        skills = list_installed_skills()
+
+    console.print(f"[bold #00ff88]:: TOKTOPUS : Interactive Skill Editor ({active_agent_key.upper()}) ::[/bold #00ff88]")
+    if skills:
+        console.print("[dim]Installed skills:[/dim]")
+        for idx, s in enumerate(skills[:10], 1):
+            console.print(f"  [bold #00f3ff][{idx}][/bold #00f3ff] [bold white]{s['name']}[/bold white] [dim]({s['agent']})[/dim]")
+
+    console.print("\n[bold white]Enter skill name or number to edit (or press Enter to cancel):[/bold white]")
+    try:
+        choice = input("> ").strip()
+    except Exception:
+        return
+
+    if not choice:
+        return
+
+    target_skill_name = choice
+    if choice.isdigit():
+        idx = int(choice) - 1
+        if 0 <= idx < len(skills):
+            target_skill_name = skills[idx]["name"]
+
+    skill_info = get_skill(target_skill_name, active_agent_key)
+    if not skill_info:
+        console.print(f"[bold #ff3366]Error: Skill '{target_skill_name}' not found.[/bold #ff3366]")
+        time.sleep(1.5)
+        return
+
+    console.print(f"\n[bold #00f3ff]Editing skill: {skill_info['name']} ({skill_info['skill_file']})[/bold #00f3ff]")
+    console.print("[dim]Choose mode: [1] Append instructions  [2] Replace entire instructions[/dim]")
+    try:
+        mode_choice = input("Mode [1]: ").strip()
+        mode = "replace" if mode_choice == "2" else "append"
+        console.print(f"\n[bold white]Enter instructions to {mode} (or leave empty to cancel):[/bold white]")
+        instruction_text = input("> ").strip()
+    except Exception:
+        return
+
+    if not instruction_text:
+        console.print("[dim]Modification cancelled.[/dim]")
+        time.sleep(1.0)
+        return
+
+    success = modify_skill(
+        skill_name=skill_info["name"],
+        instruction_delta=instruction_text,
+        agent_key=active_agent_key,
+        mode=mode
+    )
+    if success:
+        console.print(f"[bold #00ff88]:: Successfully modified skill '{skill_info['name']}'! ::[/bold #00ff88]")
+    else:
+        console.print(f"[bold #ff3366]Error: Failed to modify skill '{skill_info['name']}'.[/bold #ff3366]")
+    time.sleep(1.5)
 
 def print_benchmarks_table():
     from toktopus.ui.charts import relative_benchmark_bar
@@ -171,7 +231,7 @@ def main():
     )
     parser.add_argument(
         "--agent", "-a",
-        choices=["antigravity", "claude", "opencode", "cursor", "codex", "auto"],
+        choices=["antigravity", "claude", "opencode", "cursor", "codex", "pi", "auto"],
         default=saved_cfg.get("active_agent", "auto"),
         help="Target AI agent to monitor (default: saved config or auto)"
     )
@@ -241,7 +301,7 @@ def main():
     )
     parser.add_argument(
         "--to-agent",
-        choices=["antigravity", "claude", "opencode", "cursor", "codex"],
+        choices=["antigravity", "claude", "opencode", "cursor", "codex", "pi"],
         help="Target agent harness when copying a skill"
     )
     parser.add_argument(
@@ -335,11 +395,12 @@ def main():
         plan_tier = normalize_plan_key(args.plan, active_agent_key)
         save_config({"plan_tier": plan_tier})
     else:
-        plan_tier = normalize_plan_key(saved_cfg.get("plan_tier", "google-ai-pro"), active_agent_key)
+        plan_tier = auto_detect_plan(active_agent_key)
 
     saved_pricing = saved_cfg.get("pricing_model", "gemini-3.8-flash")
     current_pricing_idx = PRICING_KEYS.index(saved_pricing) if saved_pricing in PRICING_KEYS else 0
     show_full_benchmarks = bool(saved_cfg.get("show_benchmarks", False))
+    show_skills_expanded = False
 
     adapter = get_adapter(active_agent_key)
     telemetry = adapter.get_session_telemetry()
@@ -357,6 +418,7 @@ def main():
             PRICING_KEYS[current_pricing_idx],
             plan_tier_key=plan_tier,
             show_full_benchmarks=False,
+            show_skills_expanded=False,
             console_height=console.size.height,
             console_width=console.size.width
         )
@@ -377,7 +439,7 @@ def main():
                 elif key in KEY_MAP:
                     active_agent_key = KEY_MAP[key]
                     adapter = get_adapter(active_agent_key)
-                    plan_tier = normalize_plan_key(plan_tier, active_agent_key)
+                    plan_tier = auto_detect_plan(active_agent_key)
                     save_config({"active_agent": active_agent_key, "plan_tier": plan_tier})
                     last_refresh = 0.0
                 elif key == "p":
@@ -410,15 +472,13 @@ def main():
                     init_keyboard()
                     last_refresh = 0.0
                 elif key == "s":
-                    # Show skills vault summary
+                    # Toggle collapsible skill vault
+                    show_skills_expanded = not show_skills_expanded
+                    last_refresh = 0.0
+                elif key == "e":
+                    # In-place interactive skill editor
                     restore_keyboard()
-                    console.clear()
-                    print_skills_table(active_agent_key)
-                    console.print("[dim]Press Enter to return to monitor...[/dim]")
-                    try:
-                        input()
-                    except Exception:
-                        pass
+                    interactive_edit_skill(active_agent_key)
                     init_keyboard()
                     last_refresh = 0.0
                 elif key == "r":
@@ -435,6 +495,7 @@ def main():
                         PRICING_KEYS[current_pricing_idx],
                         plan_tier_key=plan_tier,
                         show_full_benchmarks=show_full_benchmarks,
+                        show_skills_expanded=show_skills_expanded,
                         console_height=console.size.height,
                         console_width=console.size.width
                     )

@@ -2,6 +2,7 @@ import unittest
 from toktopus.core.limits import (
     TIER_LIMITS,
     normalize_plan_key,
+    auto_detect_plan,
     get_next_plan,
     estimate_account_limits
 )
@@ -66,6 +67,16 @@ class TestLimitsAndConfig(unittest.TestCase):
         self.assertEqual(get_default_plan_for_agent("claude"), "claude-pro")
         self.assertEqual(get_default_plan_for_agent("opencode"), "opencode-zen")
         self.assertEqual(get_default_plan_for_agent("cursor"), "cursor-pro")
+        self.assertEqual(get_default_plan_for_agent("codex"), "codex-pro")
+        self.assertEqual(get_default_plan_for_agent("pi"), "pi-pro")
+
+    def test_auto_detect_plan(self):
+        self.assertEqual(auto_detect_plan("antigravity"), "google-ai-pro")
+        self.assertEqual(auto_detect_plan("claude"), "claude-pro")
+        self.assertEqual(auto_detect_plan("opencode"), "opencode-zen")
+        self.assertEqual(auto_detect_plan("cursor"), "cursor-pro")
+        self.assertEqual(auto_detect_plan("codex"), "codex-pro")
+        self.assertEqual(auto_detect_plan("pi"), "pi-pro")
 
     def test_config_save_and_load(self):
         self.assertTrue(save_config({"test_key": "test_val"}))
