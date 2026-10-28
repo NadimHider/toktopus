@@ -9,7 +9,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "active_agent": "antigravity",
     "plan_tier": "google-ai-pro",
     "pricing_model": "gemini-3.8-flash",
-    "refresh_rate": 1.0,
+    "refresh_rate": 0.3,
     "show_benchmarks": False
 }
 
@@ -22,6 +22,8 @@ def load_config() -> Dict[str, Any]:
             data = json.load(f)
             merged = dict(DEFAULT_CONFIG)
             merged.update(data)
+            if merged.get("refresh_rate") == 1.0:
+                merged["refresh_rate"] = 0.3
             return merged
     except Exception:
         return dict(DEFAULT_CONFIG)

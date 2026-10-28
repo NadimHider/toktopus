@@ -1,6 +1,17 @@
 from typing import List, Dict, Any
 
 BRAILLE_LEVELS = [" ", "⡀", "⣀", "⠤", "⠶", "⠒", "⠊", "⠉", "⠑"]
+SUB_BLOCKS = [" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"]
+
+def format_metric_number(val: float | int) -> str:
+    n = float(val)
+    if n >= 1_000_000_000:
+        return f"{n / 1_000_000_000:.1f}B"
+    elif n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    elif n >= 1_000:
+        return f"{n / 1_000:.1f}K"
+    return f"{int(n)}"
 
 def braille_sparkline(data: List[int], max_width: int = 28) -> str:
     if not data:

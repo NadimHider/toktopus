@@ -31,6 +31,7 @@ from toktopus.core.skills import (
     copy_skill
 )
 from toktopus.game import run_space_impact
+from toktopus.core.pet import get_cyber_pet, run_pet_lounge
 
 console = Console(theme=THEME_CONFIG)
 
@@ -201,6 +202,12 @@ def main():
         help="Play the Space Impact terminal arcade game and exit"
     )
     parser.add_argument(
+        "--pet", "--pet-lounge",
+        dest="run_pet",
+        action="store_true",
+        help="Launch the interactive Tokto Pet Lounge habitat and exit"
+    )
+    parser.add_argument(
         "--skills", "--list-skills",
         dest="list_skills",
         action="store_true",
@@ -240,8 +247,8 @@ def main():
     parser.add_argument(
         "--rate", "-r",
         type=float,
-        default=float(saved_cfg.get("refresh_rate", 1.0)),
-        help="Refresh interval in seconds (default: 1.0)"
+        default=float(saved_cfg.get("refresh_rate", 0.3)),
+        help="Refresh interval in seconds (default: 0.3)"
     )
     parser.add_argument(
         "--no-color",
@@ -261,6 +268,10 @@ def main():
 
     if args.run_game:
         run_space_impact(standalone=True)
+        sys.exit(0)
+
+    if args.run_pet:
+        run_pet_lounge()
         sys.exit(0)
 
     if args.benchmarks:
@@ -346,7 +357,8 @@ def main():
             PRICING_KEYS[current_pricing_idx],
             plan_tier_key=plan_tier,
             show_full_benchmarks=False,
-            console_height=console.size.height
+            console_height=console.size.height,
+            console_width=console.size.width
         )
         console.print(dashboard)
         sys.exit(0)
@@ -368,9 +380,20 @@ def main():
                     plan_tier = normalize_plan_key(plan_tier, active_agent_key)
                     save_config({"active_agent": active_agent_key, "plan_tier": plan_tier})
                     last_refresh = 0.0
-                elif key in ("p", "t"):
+                elif key == "p":
                     plan_tier = get_next_plan(plan_tier, active_agent_key)
                     save_config({"plan_tier": plan_tier})
+                    last_refresh = 0.0
+                elif key == "f":
+                    get_cyber_pet().feed()
+                    last_refresh = 0.0
+                elif key == "t":
+                    get_cyber_pet().pet()
+                    last_refresh = 0.0
+                elif key == "o":
+                    restore_keyboard()
+                    run_pet_lounge()
+                    init_keyboard()
                     last_refresh = 0.0
                 elif key == "m":
                     current_pricing_idx = (current_pricing_idx + 1) % len(PRICING_KEYS)
@@ -412,12 +435,13 @@ def main():
                         PRICING_KEYS[current_pricing_idx],
                         plan_tier_key=plan_tier,
                         show_full_benchmarks=show_full_benchmarks,
-                        console_height=console.size.height
+                        console_height=console.size.height,
+                        console_width=console.size.width
                     )
                     live.update(dashboard, refresh=True)
                     last_refresh = now
 
-                time.sleep(0.04)
+                time.sleep(0.02)
     except KeyboardInterrupt:
         pass
     finally:

@@ -72,5 +72,26 @@ class TestLayoutFeatures(unittest.TestCase):
         layout = build_dashboard(telemetry, sys_metrics, "claude", "claude-3-7-sonnet", plan_tier_key="claude-pro")
         self.assertIsNotNone(layout)
 
+    def test_responsive_layout_widths(self):
+        telemetry = {
+            "agent_name": "Antigravity",
+            "session_id": "resp-test",
+            "model_name": "Gemini 3.8 Flash",
+            "current_context_tokens": 5000,
+            "max_context_tokens": 100000,
+            "input_tokens": 2000,
+            "output_tokens": 500,
+            "cache_read_tokens": 2500
+        }
+        sys_metrics = {"host_cpu_percent": 10.0, "host_ram_used_gb": 4.0, "host_ram_total_gb": 16.0, "host_ram_percent": 25.0, "ai_processes": [], "gpu": None}
+        
+        # Test wide layout (>= 102 cols)
+        wide_layout = build_dashboard(telemetry, sys_metrics, "antigravity", "gemini-3.8-flash", console_width=120)
+        self.assertIsNotNone(wide_layout)
+
+        # Test narrow layout (< 102 cols)
+        narrow_layout = build_dashboard(telemetry, sys_metrics, "antigravity", "gemini-3.8-flash", console_width=85)
+        self.assertIsNotNone(narrow_layout)
+
 if __name__ == "__main__":
     unittest.main()

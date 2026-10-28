@@ -9,10 +9,16 @@ from toktopus.ui.charts import (
     efficiency_status_badge,
     cache_split_bar,
     cache_trend_sparkline,
-    cost_burn_bar
+    cost_burn_bar,
+    format_metric_number
 )
 
 class TestCharts(unittest.TestCase):
+    def test_format_metric_number(self):
+        self.assertEqual(format_metric_number(500), "500")
+        self.assertEqual(format_metric_number(1500), "1.5K")
+        self.assertEqual(format_metric_number(2_500_000), "2.5M")
+        self.assertEqual(format_metric_number(1_200_000_000), "1.2B")
     def test_braille_sparkline(self):
         data = [10, 50, 100, 25, 80]
         spark = braille_sparkline(data, max_width=10)
