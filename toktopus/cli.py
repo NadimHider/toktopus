@@ -1,9 +1,13 @@
+import argparse
+import json
+import math
 import os
 import sys
 import time
-import json
-import argparse
+import webbrowser
+from pathlib import Path
 from typing import Optional
+
 from rich.console import Console
 from rich.live import Live
 from rich.table import Table
@@ -15,23 +19,28 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 from toktopus import __version__
-from toktopus.ui.theme import THEME_CONFIG
-from toktopus.ui.layout import build_dashboard
-from toktopus.adapters import KEY_MAP, get_adapter, auto_detect_active_agent
-from toktopus.core.system import get_system_telemetry
-from toktopus.core.keyboard import get_pressed_key, init_keyboard, restore_keyboard
-from toktopus.core.pricing import PRICING_TABLE, calculate_costs, resolve_pricing_model
+from toktopus.adapters import KEY_MAP, auto_detect_active_agent, get_adapter
 from toktopus.core.benchmarks import get_benchmarks, get_benchmarks_last_updated
-from toktopus.core.limits import normalize_plan_key, auto_detect_plan, get_next_plan, estimate_account_limits
 from toktopus.core.config import load_config, save_config
-from toktopus.core.skills import (
-    list_installed_skills,
-    get_skill,
-    modify_skill,
-    copy_skill
+from toktopus.core.keyboard import get_pressed_key, init_keyboard, restore_keyboard
+from toktopus.core.limits import (
+    auto_detect_plan,
+    estimate_account_limits,
+    get_next_plan,
+    normalize_plan_key,
 )
-from toktopus.game import run_space_impact
 from toktopus.core.pet import get_cyber_pet, run_pet_lounge
+from toktopus.core.pricing import PRICING_TABLE, calculate_costs, resolve_pricing_model
+from toktopus.core.skills import (
+    copy_skill,
+    get_skill,
+    list_installed_skills,
+    modify_skill,
+)
+from toktopus.core.system import get_system_telemetry
+from toktopus.game import run_space_impact
+from toktopus.ui.layout import build_dashboard
+from toktopus.ui.theme import THEME_CONFIG
 
 console = Console(theme=THEME_CONFIG)
 
@@ -222,6 +231,16 @@ def export_telemetry_snapshot(export_path: str, telemetry: dict, sys_metrics: di
 
     console.print(f"[bold #00ff88]:: Exported telemetry snapshot to {out_file} ::[/bold #00ff88]")
 
+def update_pet(telemetry: dict) -> None:
+    get_cyber_pet().tick(
+        is_active=telemetry.get("is_active", False),
+        tokens_per_sec=telemetry.get("tokens_per_sec", 0),
+        cache_eff=telemetry.get("cache_efficiency", 0.0),
+        current_ctx=telemetry.get("current_context_tokens", 0),
+        total_tokens=telemetry.get("total_tokens", 0),
+    )
+
+
 def main():
     saved_cfg = load_config()
 
@@ -260,6 +279,10 @@ def main():
         dest="run_game",
         action="store_true",
         help="Play the Space Impact terminal arcade game and exit"
+    )
+    parser.add_argument(
+        "--web-game", action="store_true",
+        help="Open the browser edition of Space Impact"
     )
     parser.add_argument(
         "--pet", "--pet-lounge",
@@ -323,8 +346,17 @@ def main():
 
     args = parser.parse_args()
 
+    if not math.isfinite(args.rate) or args.rate <= 0:
+        parser.error("--rate must be a finite positive number")
+
     if args.no_color or os.environ.get("NO_COLOR"):
         console.no_color = True
+
+    if args.web_game:
+        game_path = Path(__file__).resolve().parent / "web" / "space-impact.html"
+        if not webbrowser.open(game_path.as_uri()):
+            console.print(f"Open this file in a browser: {game_path}")
+        return
 
     if args.run_game:
         run_space_impact(standalone=True)
@@ -411,6 +443,7 @@ def main():
         sys.exit(0)
 
     if args.once:
+        update_pet(telemetry)
         dashboard = build_dashboard(
             telemetry,
             sys_metrics,
@@ -425,13 +458,16 @@ def main():
         console.print(dashboard)
         sys.exit(0)
 
+    if not sys.stdin.isatty():
+        parser.error("the live dashboard requires an interactive terminal; use --once or --export")
+
     init_keyboard()
     try:
         with Live(console=console, screen=True, auto_refresh=False) as live:
             last_refresh = 0.0
 
             while True:
-                now = time.time()
+                now = time.monotonic()
 
                 key = get_pressed_key()
                 if key == "q":
@@ -454,8 +490,10 @@ def main():
                     last_refresh = 0.0
                 elif key == "o":
                     restore_keyboard()
-                    run_pet_lounge()
-                    init_keyboard()
+                    try:
+                        run_pet_lounge()
+                    finally:
+                        init_keyboard()
                     last_refresh = 0.0
                 elif key == "m":
                     current_pricing_idx = (current_pricing_idx + 1) % len(PRICING_KEYS)
@@ -466,20 +504,24 @@ def main():
                     save_config({"show_benchmarks": show_full_benchmarks})
                     last_refresh = 0.0
                 elif key == "g":
-                    # Launch Space Impact Minigame
+
                     restore_keyboard()
-                    run_space_impact(standalone=False)
-                    init_keyboard()
+                    try:
+                        run_space_impact(standalone=False)
+                    finally:
+                        init_keyboard()
                     last_refresh = 0.0
                 elif key == "s":
-                    # Toggle collapsible skill vault
+
                     show_skills_expanded = not show_skills_expanded
                     last_refresh = 0.0
                 elif key == "e":
-                    # In-place interactive skill editor
+
                     restore_keyboard()
-                    interactive_edit_skill(active_agent_key)
-                    init_keyboard()
+                    try:
+                        interactive_edit_skill(active_agent_key)
+                    finally:
+                        init_keyboard()
                     last_refresh = 0.0
                 elif key == "r":
                     last_refresh = 0.0
@@ -487,6 +529,7 @@ def main():
                 if now - last_refresh >= args.rate:
                     telemetry = adapter.get_session_telemetry()
                     sys_metrics = get_system_telemetry()
+                    update_pet(telemetry)
 
                     dashboard = build_dashboard(
                         telemetry,

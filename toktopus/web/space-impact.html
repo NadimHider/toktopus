@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Space Impact | Toktopus</title>
+<style>
+:root{color-scheme:dark;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:#080e16;color:#d5e7e3}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px}.shell{width:min(100%,1000px)}header{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:20px}.eyebrow{font-size:11px;letter-spacing:.2em;color:#77ddbd}h1{margin:8px 0 0;font-size:clamp(24px,4vw,40px);letter-spacing:.06em}p{color:#90a9a5;line-height:1.5;font-size:13px}.badge{color:#77ddbd;border:1px solid #275e4d;padding:8px 12px;font-size:11px;white-space:nowrap}.screen{position:relative;background:#020a08;border:1px solid #306650;border-radius:8px;overflow:hidden;box-shadow:0 0 35px #2bd99b14,inset 0 0 40px #000}.screen:after{content:"";pointer-events:none;position:absolute;inset:0;background:repeating-linear-gradient(transparent 0 3px,#0006 4px);opacity:.32}.screen.clean:after{display:none}canvas{display:block;width:100%;height:auto;image-rendering:pixelated;touch-action:none}.bar{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:16px}.bar p{margin:0}.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}button{background:#101f1c;border:1px solid #315f52;color:#c4f9e5;border-radius:4px;font:inherit;font-size:12px;padding:10px 14px;cursor:pointer;touch-action:none}button:hover{background:#19382d}button:focus-visible{outline:2px solid #75f4c0;outline-offset:3px}.touch{display:none;justify-content:space-between;gap:12px;margin-top:16px}.pad{display:grid;grid-template-columns:repeat(3,48px);gap:4px}.pad button,.action button{min-width:48px;min-height:44px}.action{display:flex;align-items:center;gap:6px}@media(pointer:coarse){.touch{display:flex}}@media(max-width:560px){body{padding:12px}header{align-items:start}.badge{display:none}.bar p{font-size:11px}}
+</style>
+</head>
+<body>
+<main class="shell">
+<header><div><div class="eyebrow">TOKTOPUS / ARCADE</div><h1>SPACE IMPACT</h1></div><span class="badge">BROWSER EDITION</span></header>
+<div class="screen" id="screen"><canvas id="game" width="960" height="540" tabindex="0" aria-label="Space Impact game. Use arrow keys or WASD to move, Space to fire, Shift for heavy fire."></canvas></div>
+<div class="bar"><p>WASD / ARROWS MOVE &nbsp; SPACE FIRE &nbsp; SHIFT HEAVY</p><p>C FILTER &nbsp; ESC PAUSE &nbsp; R RESTART</p></div>
+<div class="controls"><button id="pause" type="button">Pause</button><button id="filter" type="button">Toggle CRT</button><button id="restart" type="button">Restart</button></div>
+<div class="touch" aria-label="Touch controls"><div class="pad"><span></span><button data-key="arrowup" aria-label="Move up">UP</button><span></span><button data-key="arrowleft" aria-label="Move left">LEFT</button><button data-key="arrowdown" aria-label="Move down">DOWN</button><button data-key="arrowright" aria-label="Move right">RIGHT</button></div><div class="action"><button data-key=" " >FIRE</button><button data-key="shift">HEAVY</button></div></div>
+<p>Move the pointer or touch the screen to steer. Press or hold to fire. Defeat waves, collect upgrades, and survive the Titan.</p>
+</main>
+<script>
+(()=>{
+'use strict';
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),screen=document.getElementById('screen');
+const W=canvas.width,H=canvas.height,keys=new Set(),bullets=Array.from({length:160},()=>({active:false})),particles=Array.from({length:240},()=>({active:false}));
+const enemies=[],powerups=[],stars=Array.from({length:65},(_,i)=>({x:(i*139)%W,y:(i*83)%H,s:1+i%3}));
+let player,score,high=0,wave,spawnTimer,bossThreshold,boss,paused,over,shake,last,fireTimer,heavyTimer,pointer=null;
+try{high=Math.max(0,Number(localStorage.getItem('toktopus-space-impact-high'))||0)}catch(e){}
+function reset(){player={x:90,y:H/2,vx:0,vy:0,hp:100,inv:0,weapon:1};score=0;wave=1;spawnTimer=1;bossThreshold=400;boss=null;paused=false;over=false;shake=0;last=0;fireTimer=0;heavyTimer=0;pointer=null;keys.clear();enemies.length=0;powerups.length=0;for(const p of bullets)p.active=false;for(const p of particles)p.active=false;document.getElementById('pause').textContent='Pause'}
+function alloc(pool,props){for(const item of pool)if(!item.active){Object.assign(item,props,{active:true});return item}return null}
+function explode(x,y,color,count){for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,s=35+Math.random()*150;alloc(particles,{x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.3+Math.random()*.5,color})}}
+function shot(x,y,vx,vy,friendly,damage=1,size=5){alloc(bullets,{x,y,vx,vy,friendly,damage,w:size*2,h:size,life:4})}
+function hit(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
+function save(){if(score>high){high=score;try{localStorage.setItem('toktopus-space-impact-high',String(high))}catch(e){}}}
+function damage(n){if(player.inv>0)return;player.hp-=n;player.inv=1;shake=9;explode(player.x,player.y,'#ff7181',14);if(player.hp<=0){over=true;save()}}
+function spawn(){const type=Math.random(),y=50+Math.random()*(H-100),kind=type<.45?'scout':type<.8?'zigzag':'heavy';enemies.push({x:W+30,y,base:y,w:kind==='heavy'?38:28,h:24,hp:kind==='heavy'?5:kind==='zigzag'?2:1,kind,speed:kind==='scout'?150:kind==='zigzag'?100:70,t:Math.random()*5,cool:1+Math.random()*2,points:kind==='heavy'?50:kind==='zigzag'?25:15})}
+function spawnBoss(){boss={x:W+90,y:H/2-45,w:130,h:90,hp:80+wave*15,max:80+wave*15,kind:'boss',t:0,cool:1,points:300};enemies.push(boss)}
+function update(dt){
+ if(paused||over)return;
+ player.inv=Math.max(0,player.inv-dt);fireTimer-=dt;heavyTimer-=dt;shake=Math.max(0,shake-dt*28);
+ let dx=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0),dy=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0);
+ if(pointer){dx=Math.max(-1,Math.min(1,(pointer.x-player.x)/35));dy=Math.max(-1,Math.min(1,(pointer.y-player.y)/35))}
+ const smoothing=1-Math.exp(-dt*9);player.vx+=(dx*250-player.vx)*smoothing;player.vy+=(dy*250-player.vy)*smoothing;player.x=Math.max(20,Math.min(W-30,player.x+player.vx*dt));player.y=Math.max(36,Math.min(H-24,player.y+player.vy*dt));
+ if((keys.has(' ')||pointer&&pointer.fire)&&fireTimer<=0){shot(player.x+20,player.y-3,500,0,true);if(player.weapon>1){shot(player.x+15,player.y-10,480,-35,true);shot(player.x+15,player.y+5,480,35,true)}fireTimer=player.weapon>2?.11:.18}
+ if(keys.has('shift')&&heavyTimer<=0){shot(player.x+20,player.y-7,350,0,true,5,12);heavyTimer=1.2}
+ spawnTimer-=dt;if(!boss&&spawnTimer<=0){spawn();spawnTimer=Math.max(.35,1.15-wave*.06)}if(!boss&&score>=bossThreshold){spawnBoss();bossThreshold+=400}
+ for(const s of stars){s.x-=s.s*18*dt;if(s.x<0)s.x=W}
+ for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];e.t+=dt;if(e.kind==='boss'){e.x=Math.max(W-200,e.x-60*dt);e.y=H/2-45+Math.sin(e.t*(e.hp<e.max/2?1.8:1))*140;e.cool-=dt;if(e.cool<=0){const phase=e.hp<e.max/2;shot(e.x,e.y+45,-230,0,false,1,7);if(phase){shot(e.x,e.y+20,-210,-55,false);shot(e.x,e.y+70,-210,55,false)}e.cool=phase?.45:.9}}else{e.x-=e.speed*dt;if(e.kind==='zigzag')e.y=Math.max(30,Math.min(H-30,e.base+Math.sin(e.t*3)*65));if(e.kind==='heavy'){e.cool-=dt;if(e.cool<=0){shot(e.x,e.y+10,-220,0,false);e.cool=1.7}}}
+ if(hit({x:player.x-15,y:player.y-10,w:30,h:20},e)){damage(e.kind==='boss'?40:25);if(e.kind!=='boss')e.hp=0}
+ if(e.hp<=0){if(e.killed){score+=e.points;save();if(Math.random()<.14)powerups.push({x:e.x,y:e.y,w:18,h:18});}explode(e.x+e.w/2,e.y+e.h/2,'#85ffc5',e.kind==='boss'?35:12);if(e===boss){boss=null;wave++}enemies.splice(i,1)}else if(e.x+e.w<0){enemies.splice(i,1)}}
+ for(const b of bullets){if(!b.active)continue;b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;if(b.life<=0||b.x<0||b.x>W||b.y<0||b.y>H){b.active=false;continue}if(b.friendly){for(const e of enemies){if(e.hp>0&&hit(b,e)){e.hp-=b.damage;e.killed=e.hp<=0;b.active=false;explode(b.x,b.y,'#d7ffe7',3);break}}}else if(hit(b,{x:player.x-15,y:player.y-10,w:30,h:20})){b.active=false;damage(15)}}
+ for(let i=powerups.length-1;i>=0;i--){const p=powerups[i];p.x-=70*dt;if(hit(p,{x:player.x-15,y:player.y-10,w:30,h:20})){player.weapon=Math.min(3,player.weapon+1);powerups.splice(i,1)}else if(p.x<0)powerups.splice(i,1)}
+ for(const p of particles)if(p.active){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;if(p.life<=0)p.active=false}
+}
+function draw(){ctx.fillStyle='#030e0b';ctx.fillRect(0,0,W,H);ctx.save();if(shake)ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);ctx.fillStyle='#2a6552';for(const s of stars)ctx.fillRect(s.x,s.y,s.s,s.s);ctx.shadowBlur=12;ctx.shadowColor='#55ffaf';ctx.fillStyle=player.inv>0&&Math.floor(player.inv*12)%2?'#fff':'#87ffd0';ctx.beginPath();ctx.moveTo(player.x+20,player.y);ctx.lineTo(player.x-15,player.y-11);ctx.lineTo(player.x-8,player.y);ctx.lineTo(player.x-15,player.y+11);ctx.closePath();ctx.fill();for(const e of enemies){ctx.fillStyle=e.kind==='boss'?'#e19aff':e.kind==='heavy'?'#ff7d84':'#b8ff94';ctx.fillRect(e.x,e.y,e.w,e.h);ctx.fillStyle='#063127';ctx.fillRect(e.x+e.w*.25,e.y+e.h*.3,e.w*.5,e.h*.3)}for(const b of bullets)if(b.active){ctx.fillStyle=b.friendly?'#abffd3':'#ff8994';ctx.fillRect(b.x,b.y,b.w,b.h)}for(const p of particles)if(p.active){ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,3,3)}for(const p of powerups){ctx.fillStyle='#ffe489';ctx.fillRect(p.x,p.y,p.w,p.h);ctx.fillStyle='#10352a';ctx.fillText('+',p.x+5,p.y+14)}ctx.restore();ctx.shadowBlur=0;ctx.fillStyle='#b2e8cf';ctx.font='16px monospace';ctx.fillText(`SCORE ${String(score).padStart(5,'0')}   HIGH ${String(high).padStart(5,'0')}   WAVE ${wave}   HP ${Math.max(0,player.hp)}   WEAPON ${player.weapon}`,20,25);if(boss){ctx.fillStyle='#683a70';ctx.fillRect(W-220,40,190,6);ctx.fillStyle='#edb8ff';ctx.fillRect(W-220,40,190*Math.max(0,boss.hp)/boss.max,6)}if(paused||over){ctx.fillStyle='#001b16dd';ctx.fillRect(W/2-160,H/2-48,320,96);ctx.textAlign='center';ctx.fillStyle='#d8ffeb';ctx.font='bold 28px monospace';ctx.fillText(over?'GAME OVER':'PAUSED',W/2,H/2-5);ctx.font='14px monospace';ctx.fillText(over?'PRESS R TO RESTART':'PRESS ESC TO RESUME',W/2,H/2+25);ctx.textAlign='left'}}
+function loop(t){if(!last)last=t;const dt=Math.min(.05,(t-last)/1000);last=t;update(dt);draw();requestAnimationFrame(loop)}
+function pause(){if(!over){paused=!paused;document.getElementById('pause').textContent=paused?'Resume':'Pause'}}
+function filter(){screen.classList.toggle('clean')}
+window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if([' ','shift','arrowup','arrowdown','arrowleft','arrowright','escape'].includes(k))e.preventDefault();if(e.repeat&&['escape','c','r'].includes(k))return;if(k==='escape')pause();else if(k==='c')filter();else if(k==='r')reset();else keys.add(k)});
+window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();pointer=null;if(!paused&&!over)pause()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&!paused&&!over)pause()});
+canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);pointer={x:0,y:0,fire:true};move(e)});canvas.addEventListener('pointermove',e=>{if(pointer)move(e)});function move(e){const r=canvas.getBoundingClientRect();pointer.x=(e.clientX-r.left)*W/r.width;pointer.y=(e.clientY-r.top)*H/r.height}canvas.addEventListener('pointerup',()=>pointer=null);canvas.addEventListener('pointercancel',()=>pointer=null);
+for(const b of document.querySelectorAll('[data-key]')){const k=b.dataset.key;b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);keys.add(k)});b.addEventListener('pointerup',()=>keys.delete(k));b.addEventListener('pointercancel',()=>keys.delete(k))}
+for(const [id,fn] of [['pause',pause],['filter',filter],['restart',reset]])document.getElementById(id).addEventListener('click',fn);
+reset();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

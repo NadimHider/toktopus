@@ -1,20 +1,22 @@
 import unittest
+
 from toktopus.ui.charts import (
     braille_sparkline,
-    context_gauge,
-    stacked_token_ratio_bar,
-    mini_cpu_gauge,
-    relative_benchmark_bar,
     cache_efficiency_gauge,
-    efficiency_status_badge,
     cache_split_bar,
     cache_trend_sparkline,
+    context_gauge,
     cost_burn_bar,
+    efficiency_status_badge,
     format_metric_number,
     large_cache_gauge,
+    mini_cpu_gauge,
+    relative_benchmark_bar,
+    stacked_token_ratio_bar,
+    system_resource_bar,
     token_composition_tank,
-    system_resource_bar
 )
+
 
 class TestCharts(unittest.TestCase):
     def test_format_metric_number(self):

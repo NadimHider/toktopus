@@ -1,6 +1,9 @@
 import unittest
-from toktopus.core.pet import CyberPet, get_cyber_pet
+
 from rich.panel import Panel
+
+from toktopus.core.pet import CyberPet, get_cyber_pet
+
 
 class TestCyberPet(unittest.TestCase):
     def setUp(self):
@@ -18,7 +21,7 @@ class TestCyberPet(unittest.TestCase):
         self.assertEqual(self.pet.level, 1)
         self.assertEqual(self.pet.xp, 50)
 
-        # 50 + 60 = 110 >= 100 -> Level up to 2
+
         self.pet.add_xp(60)
         self.assertEqual(self.pet.level, 2)
         self.assertEqual(self.pet.xp, 10)
@@ -43,7 +46,7 @@ class TestCyberPet(unittest.TestCase):
         self.assertGreater(self.pet.action_timer, 0)
 
     def test_autonomous_coding_tick(self):
-        # When agent is actively streaming tokens
+
         self.pet.tick(is_active=True, tokens_per_sec=120, cache_eff=50.0, current_ctx=20000, total_tokens=50000)
         self.assertEqual(self.pet.state, "coding")
         sprite = self.pet.get_current_sprite()
@@ -51,11 +54,11 @@ class TestCyberPet(unittest.TestCase):
         self.assertGreater(len(sprite), 2)
 
     def test_autonomous_cache_high_tick(self):
-        # When cache efficiency is >= 80% and not streaming actively
+
         self.pet.tick(is_active=False, tokens_per_sec=0, cache_eff=92.0, current_ctx=50000, total_tokens=100000)
         self.assertEqual(self.pet.state, "cache_high")
         sprite = self.pet.get_current_sprite()
-        # Sunglasses sprite
+
         self.assertTrue(any("B )" in line for line in sprite))
 
     def test_autonomous_hungry_tick(self):

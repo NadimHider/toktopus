@@ -1,8 +1,9 @@
 import os
-import time
-import subprocess
 import shutil
-from typing import Dict, List, Any, Optional
+import subprocess
+import time
+from typing import Any, Dict, List, Optional
+
 import psutil
 
 AI_PROCESS_NAMES = {
@@ -37,7 +38,7 @@ def _scan_ai_processes() -> List[Dict[str, Any]]:
                         matched_label = label
                         break
 
-                # Also inspect language_server if it explicitly mentions antigravity or gemini
+
                 if not matched_label and "language_server" in lower_name:
                     try:
                         cmdline_str = " ".join(proc.cmdline() or []).lower()
@@ -46,7 +47,7 @@ def _scan_ai_processes() -> List[Dict[str, Any]]:
                     except (psutil.AccessDenied, psutil.NoSuchProcess):
                         pass
 
-                # Inspect script runners on Windows, Linux, and macOS
+
                 is_script_runner = lower_name in (
                     "python.exe", "python3.exe", "node.exe", "electron.exe",
                     "python", "python3", "node", "electron"
@@ -125,7 +126,7 @@ def get_system_telemetry() -> Dict[str, Any]:
     used_ram_gb = round(mem.used / (1024 ** 3), 1)
     ram_percent = mem.percent or 0.0
 
-    # Extended CPU metrics
+
     cpu_freq_mhz = 0.0
     try:
         freq = psutil.cpu_freq()
@@ -142,7 +143,7 @@ def get_system_telemetry() -> Dict[str, Any]:
     except Exception:
         pass
 
-    # Extended Swap memory metrics
+
     swap_used_gb = 0.0
     swap_total_gb = 0.0
     swap_percent = 0.0
@@ -154,7 +155,7 @@ def get_system_telemetry() -> Dict[str, Any]:
     except Exception:
         pass
 
-    # Extended Disk storage metrics
+
     disk_used_gb = 0.0
     disk_total_gb = 0.0
     disk_free_gb = 0.0
@@ -169,7 +170,7 @@ def get_system_telemetry() -> Dict[str, Any]:
     except Exception:
         pass
 
-    # Extended Network I/O metrics
+
     net_sent_mb = 0.0
     net_recv_mb = 0.0
     try:

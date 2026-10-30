@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 PRICING_TABLE: Dict[str, Dict[str, Any]] = {
     "gemini-3.8-flash": {
@@ -131,7 +131,7 @@ def resolve_pricing_model(
     if "qwen" in raw:
         return "qwen-2-5-coder-32b"
 
-    # Fallback based on agent
+
     agent_clean = (agent_key or "").lower()
     if agent_clean == "claude" or agent_clean == "cursor":
         return "claude-3-7-sonnet"
@@ -168,7 +168,7 @@ def calculate_costs(
 
     cost_spent = cost_in + cost_out + cost_cache_read + cost_cache_write + cost_reasoning
 
-    # What the run would cost without prompt caching (all cached tokens billed as full input)
+
     cost_without_cache = ((input_tokens + cache_read_tokens) * rate_in) + (output_tokens * rate_out) + (reasoning_tokens * rate_reasoning)
     cost_saved = max(0.0, cost_without_cache - cost_spent)
     savings_pct = (cost_saved / cost_without_cache * 100.0) if cost_without_cache > 0 else 0.0

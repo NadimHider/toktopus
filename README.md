@@ -1,207 +1,148 @@
-# toktopus
+<div align="center">
 
-toktopus is a personal hobby project I built to monitor token usage, active context windows, and account limits in real time while working with AI coding agents. It supports Google Antigravity, Claude Code, OpenCode, Cursor, Codex, and Pi Agent.
+# TOKTOPUS
 
-```text
-  _       _    _                      
- | |_ ___ | | _| |_ ___  _ __  _   _ ___ 
- | __/ _ \| |/ / __/ _ \| '_ \| | | / __|
- | || (_) |   <| || (_) | |_) | |_| \__ \
-  \__\___/|_|\_\\__\___/| .__/ \__,_|___/
-                        |_|              
-   Universal Terminal Monitor for AI Coding Agents
-```
+**A local terminal dashboard for coding-agent telemetry, costs, and system activity.**
 
----
+[![Stars](https://img.shields.io/github/stars/NadimHider/toktopus?style=for-the-badge&logo=github&color=0f172a&labelColor=090d16)](https://github.com/NadimHider/toktopus/stargazers)
+[![Forks](https://img.shields.io/github/forks/NadimHider/toktopus?style=for-the-badge&logo=github&color=0f172a&labelColor=090d16)](https://github.com/NadimHider/toktopus/network/members)
+[![Watchers](https://img.shields.io/github/watchers/NadimHider/toktopus?style=for-the-badge&logo=github&color=0f172a&labelColor=090d16)](https://github.com/NadimHider/toktopus/watchers)
+[![Issues](https://img.shields.io/github/issues/NadimHider/toktopus?style=for-the-badge&logo=github&color=00ff66&labelColor=090d16)](https://github.com/NadimHider/toktopus/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/NadimHider/toktopus?style=for-the-badge&color=00ccff&labelColor=090d16)](https://github.com/NadimHider/toktopus/commits/main)
+[![Repo Size](https://img.shields.io/github/repo-size/NadimHider/toktopus?style=for-the-badge&color=ff0055&labelColor=090d16)](https://github.com/NadimHider/toktopus)
+[![Top Language](https://img.shields.io/github/languages/top/NadimHider/toktopus?style=for-the-badge&color=ffaa00&labelColor=090d16)](https://github.com/NadimHider/toktopus)
+[![License](https://img.shields.io/github/license/NadimHider/toktopus?style=for-the-badge&color=a855f7&labelColor=090d16)](./LICENSE)
 
-## Features
+[Documentation](#overview) · [Quick Start](#quick-start) · [Architecture](#system-architecture) · [Report Issue](https://github.com/NadimHider/toktopus/issues/new?labels=bug) · [Request Feature](https://github.com/NadimHider/toktopus/issues/new?labels=enhancement)
 
-* Collapsible Cross-Agent Skill Vault: Positioned directly beneath stats. Defaults to a compact cross-agent overview across Antigravity, Claude, OpenCode, Cursor, Codex, and Pi. Press `S` to expand into an interactive skill table or press `E` to edit instructions in-place with automatic `.md.bak` backups.
-* Automated Model and Subscription Plan Extraction: Dynamically detects currently active models and subscription plans across all agents (Antigravity `settings.json`, Claude `~/.claude.json`, Codex rollouts, OpenCode SQLite, Cursor `state.vscdb`, Pi session config) so you never have to manually configure plans.
-* Upgraded Autonomous Cyber-Pet ("Tokto"): An interactive companion living in your terminal monitor. Tokto features articulated tentacles, cute animated expressions, cyber-shades during elite cache hits, XP progression bars, fuel/joy status, and real-time speech bubbles.
-* Interactive Pet Controls: Press `F` to drop crunchy token snacks (`+30 Fuel`), press `T` to give scratches (`+25 Joy`), or press `O` / `--pet` to enter the full-screen aquarium Pet Lounge habitat.
-* High-Impact Cache and Leverage Visualizations: High-resolution meters (`large_cache_gauge`), 24-turn Braille trend sparklines, multi-tier token composition fuel tank (Cache, In, Out, Reasoning), and net cash savings multipliers.
-* Extended System Hardware Telemetry: Comprehensive host monitoring tracking CPU frequency (MHz), physical and logical core counts, RAM, Swap memory used/total, Disk storage free/used GB, Network I/O sent/received MB, and GPU metrics.
-* Universal Agent Support: Seamless hotkey switching between Google Antigravity (`1`), Claude Code (`2`), OpenCode (`3`), Cursor (`4`), Codex (`5`), and Pi Agent (`6`).
-* 300ms Ultra-Fast Auto-Refresh: Cycles at 3.33 FPS (every 300 milliseconds) for fluid ASCII animations, instant gauge updates, and real-time telemetry with cached non-blocking I/O.
-* Retro Space Impact Terminal Arcade Game: Play a retro space shooter directly in your terminal with spaceship controls, lasers, scout aliens, interceptors, heavy fighters, asteroids, boss waves, HP bar, and scoring.
-* Dedicated Session Billing and Model Pricing: Displays live input, output, and cache rates per 1M tokens, calculates cumulative session spend vs spend without caching, per-step cost, hourly burn rate velocity, and projected 1k turn expenses.
-* Context Utilization Warnings: Triggers an in-terminal alert whenever active context usage reaches 85% or higher so you can compact the session before hitting boundaries.
-* Frontier Model Benchmarks: Displays weekly-calibrated Coding ELO, SWE-bench Verified, and throughput metrics for current frontier models.
-* Telemetry Export: Export instantaneous session snapshots as clean JSON files for scripting, CI runs, or usage auditing.
+<br />
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/screenshot.png">
+  <source media="(prefers-color-scheme: light)" srcset="./assets/screenshot.png">
+  <img alt="Toktopus terminal dashboard with sample telemetry" src="./assets/screenshot.png" width="100%" style="max-width: 880px; border: 1px solid #1e293b; border-radius: 4px;">
+</picture>
+
+</div>
 
 ---
 
-## Terminal View
+> [!IMPORTANT]
+> Toktopus normalizes locally available coding-agent telemetry through agent-specific adapters and displays it alongside host metrics. Pricing and account-limit figures are estimates based on the configured model and plan, not authoritative billing or quota data.
 
-```text
-+-----------------------------------------------------------------------------+
-| :: TOKTOPUS v1.6.0 :: Universal AI Agent Monitor  [Agent: Antigravity 2.0]   |
-+-----------------------------------------------------------------------------+
-| [CONTEXT & LIMITS]        | [CACHE & LEVERAGE]        | [TOKTO COMPANION]   |
-| Model:  Gemini 3.8 Flash  | Ratio:  96.5% [ELITE]     |    .-------.  Tokto |
-| Plan:   [PRO PLAN]        | Trend:  ...... (cache %)  |   /  >   <  \ (Lv.2)|
-| Context:[████░░░░░░] 8.8% | Split:  C: 145M | In: 5M  |  (|   ===   |)[STRM]|
-| Minute: 4.4% [SAFE] (3.8M)| Leverage: 28.4x multiplier|   /|\/~~~\/|\ XP 60%|
-| Request:12 / 360 rpm      | Saved:  +$9.20 (74% off)  |  [F] Feed [T] Pet   |
-+-----------------------------------------------------------------------------+
-| [SESSION BILLING & PRICING]           | [TOKEN VELOCITY & BURNS]            |
-| Model:   Gemini 3.8 Flash (DeepMind)  | Session Volume: 151.3M total tokens |
-| Rates:   In: $0.10 | Out: $0.40 | C:  | Tank:       [█████████████░░░░]     |
-| Spend:   $3.8520 (Without Cache $14)  | Breakdown:  C: 145M In: 5.3M Out: 1M|
-| Proj:    $0.028/step | $0.82/hr       | Speed:      142k tok/step           |
-+-----------------------------------------------------------------------------+
-| [SKILLS VAULT : CROSS-AGENT OVERVIEW (COLLAPSED)]                           |
-| Antigravity: 86 sk | Claude: 188 sk | OpenCode: 1 sk | Cursor: 2 sk | Pi: 5 |
-| [Press 'S' to Expand/Inspect | 'E' to Edit Skill] -- Active: Antigravity    |
-+-----------------------------------------------------------------------------+
-| [REAL-TIME AGENT STEP TRANSCRIPT]                                           |
-| #2269 [PLANNER_RESPONSE] run_command    174.3K tok (98% cached)             |
-| #2270 [GENERIC]          direct turn    0 tok                               |
-| #2271 [PLANNER_RESPONSE] run_command    176.9K tok (98% cached)             |
-+-----------------------------------------------------------------------------+
-| [EXTENDED SYSTEM HARDWARE & PROCESS TELEMETRY]                              |
-| Host CPU: [====------] 18.2% @ 3408MHz (4P/4L) | RAM: [====------] 12.8GB  |
-| Disk: [====------] 432GB / 930GB (Free 498GB)  | Net: Up 986MB / Down 4.6GB|
-| Active Processes: Antigravity (PID 5968): CPU 1.2% | OpenCode (PID 17308)   |
-+-----------------------------------------------------------------------------+
-| [1-6] Agent [P] Plan [M] Model [B] Bench [S] Skills [E] Edit [G] Game [Q]   |
-+-----------------------------------------------------------------------------+
-```
+## Overview
 
----
+Toktopus is a Python terminal application for monitoring Antigravity, Claude Code, OpenCode, Cursor, Codex, and Pi. It reads locally available session data, presents a Rich dashboard, and can export a JSON snapshot for downstream scripts. The dashboard includes a skill vault, model benchmark table, an interactive companion, and a terminal Space Impact game. A separate browser edition of the game is bundled with the package.
 
-## Installation
+### Core Capabilities
 
-### Windows (PowerShell)
-```powershell
-irm https://raw.githubusercontent.com/NadimHider/toktopus/main/scripts/install.ps1 | iex
-```
+- **Agent telemetry:** Agent adapters discover local sessions and normalize available token, model, and activity data into a dashboard-friendly snapshot.
+- **Costs and limits:** Pricing tables and plan heuristics calculate estimated session costs, cache savings, and quota indicators. Host CPU, memory, process, disk, network, and available GPU metrics are collected with psutil and optional NVIDIA tooling.
+- **Terminal workflows:** Switch agents and views interactively, inspect or modify installed skills, display benchmarks, and export snapshots as JSON.
+- **Embedded arcade subsystem (Space Impact):** The terminal shooter uses a fixed-step simulation and persists its high score in the application configuration. The optional browser edition uses a delta-time animation loop, bounded projectile and particle pools, collision boxes, wave patterns, boss phases, power-ups, and a CRT-inspired canvas.
 
-### Linux and macOS (Bash)
+## Quick Start
+
+Requires Python 3.9 or newer and an interactive terminal for the live dashboard and terminal game.
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NadimHider/toktopus/main/scripts/install.sh | bash
-```
-
-### Python Package
-```bash
-pip install toktopus
-# or run directly with pipx:
-pipx run toktopus
-```
-
----
-
-## Usage
-
-Start live monitoring (defaults to 300 millisecond refresh):
-```bash
+git clone https://github.com/NadimHider/toktopus.git
+cd toktopus
+python -m pip install .
 toktopus
 ```
 
-### Flags
-
-| Flag | Short | Description |
-| :--- | :--- | :--- |
-| `--agent <name>` | `-a` | Select active agent (`antigravity`, `claude`, `opencode`, `cursor`, `codex`, `pi`, `auto`) |
-| `--plan <tier>` | `-p` | Set active plan tier (`pro`, `payg`, `free`, `claude-pro`, `opencode-zen`, `codex-pro`, `pi-pro`) |
-| `--rate <sec>` | `-r` | Refresh interval in seconds (default: 0.3 for 300ms) |
-| `--pet`, `--pet-lounge` | | Enter the full-screen interactive Tokto Pet Lounge habitat and exit |
-| `--game`, `--space-impact` | | Launch the retro Space Impact terminal arcade game and exit |
-| `--skills`, `--list-skills` | | List installed agent skills across coding harnesses and exit |
-| `--get-skill <name>` | | Inspect and print the contents of a specific skill |
-| `--modify-skill <name>` | | Modify or append instructions to an existing installed skill |
-| `--instruction <text>` | | Instruction content to append or apply when modifying a skill |
-| `--mode <mode>` | | Modification mode: `append`, `prepend`, or `replace` (default: append) |
-| `--copy-skill <name>` | | Copy an installed skill to another agent harness |
-| `--to-agent <agent>` | | Target agent harness when copying a skill (`antigravity`, `claude`, `opencode`, `cursor`, `codex`, `pi`) |
-| `--once` | | Output a single snapshot and exit (useful for scripts) |
-| `--export <path>` | `-e` | Export current telemetry snapshot as JSON to file and exit |
-| `--benchmarks` | `-b` | Display benchmark leaderboard table and exit |
-| `--no-color` | | Disable color styling (also respects NO_COLOR env var) |
-| `--version` | `-v` | Display version information |
-
----
-
-## Hotkeys
-
-| Key | Action |
-| :--- | :--- |
-| `1` - `6` | Switch active agent (1: Antigravity, 2: Claude, 3: OpenCode, 4: Cursor, 5: Codex, 6: Pi) |
-| `S` | Toggle collapsible / expandable Skill Vault directly beneath stats |
-| `E` | In-place interactive skill editor (modify or append skill instructions) |
-| `F` | Feed Tokto a token snack (+30 Fuel, +15 Joy) |
-| `T` | Pet Tokto (+25 Joy) |
-| `O` | Open full-screen Tokto Pet Lounge aquarium habitat |
-| `G` | Launch retro Space Impact arcade game from the monitor |
-| `P` | Cycle plan tier (Google AI Pro Plan, Pay-As-You-Go, Free Tier, etc.) |
-| `M` | Cycle pricing models to compare theoretical token costs |
-| `B` | Toggle expanded benchmark table |
-| `R` | Force an immediate disk rescan and UI refresh |
-| `Q` | Quit back to shell |
-
-Preferences are saved to `~/.config/toktopus/config.json`.
-
----
-
-## Tokto: Autonomous Cyber-Octopus Pet
-
-toktopus v1.6.0 introduces an upgraded Tokto design with articulated tentacles and level XP progress:
-
-* Autonomous state machine: watches your streaming tokens, dances when cache hits are high, gets hungry if neglected, and falls asleep when coding sessions pause.
-* Real-time quips: shares humorous coding thoughts in live speech bubbles.
-* Level progression: Tokto gains XP as you burn and digest tokens!
-* Interactive keys: press `F` to drop treats or `T` to pet anytime in the live dashboard.
-* Full-screen Aquarium Habitat:
-  ```bash
-  toktopus --pet
-  ```
-  Or press `O` while the monitor is running to swim around, drop snacks, and explore Tokto's cyber habitat.
-
----
-
-## Retro Space Impact Game
-
-Play a retro arcade shooter directly in your terminal while waiting for long agent runs:
-
 ```bash
+toktopus --once
+toktopus --export telemetry.json
 toktopus --game
+toktopus --web-game
+python -m unittest discover -s tests
 ```
 
-Or press `G` from inside the live monitoring dashboard.
+> [!TIP]
+> Use `toktopus --once` or `--export PATH` for non-interactive jobs, and set `NO_COLOR=1` or pass `--no-color` for plain output. An export can contain session and host details; review it before sharing.
 
----
+## Configuration & Controls
 
-## Cross-Agent Skill Management
+Settings are stored in `~/.config/toktopus/config.json`. The browser game stores its own high score in browser local storage when available. Browser local-storage behavior for local files depends on the browser.
 
-Inspect, modify, and migrate skills across any installed agent harness:
+| Action / Command | Primary Trigger | Description |
+| :--- | :---: | :--- |
+| Select agent | <kbd>1</kbd>–<kbd>6</kbd> or `--agent NAME` | Select Antigravity, Claude, OpenCode, Cursor, Codex, or Pi; `auto` attempts detection. |
+| Change plan or model | <kbd>P</kbd> / <kbd>M</kbd> | Cycle plan estimates or pricing models. `--plan` sets a plan at launch. |
+| Dashboard views | <kbd>B</kbd> / <kbd>S</kbd> / <kbd>E</kbd> | Toggle benchmarks, expand skills, or edit a skill. |
+| Pet and arcade | <kbd>O</kbd> / <kbd>G</kbd> | Open the pet lounge or terminal game; <kbd>F</kbd> feeds and <kbd>T</kbd> pets the companion. |
+| Refresh / quit | <kbd>R</kbd> / <kbd>Q</kbd> | Refresh immediately or exit. `--rate SECONDS` controls the refresh interval, default 0.3. |
+| Snapshot / export | `--once` / `--export PATH` | Print one dashboard or write a JSON snapshot and exit. |
+| Skills | `--skills`, `--get-skill NAME`, `--modify-skill NAME`, `--copy-skill NAME` | List, inspect, edit, or copy skills; see `toktopus --help` for required companion arguments. |
+| Space Impact: Move | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> / <kbd>Arrows</kbd> | Move in either game edition. The browser edition also supports pointer and touch controls. |
+| Space Impact: Fire | <kbd>Space</kbd> / <kbd>Shift</kbd> | Fire in either edition; <kbd>Shift</kbd> fires heavy ordnance in the browser edition. |
+| Space Impact: Pause and filter | <kbd>P</kbd> / <kbd>Esc</kbd> / <kbd>C</kbd> | Terminal: <kbd>P</kbd> pauses, <kbd>Q</kbd> or <kbd>Esc</kbd> exits. Browser: <kbd>Esc</kbd> pauses and <kbd>C</kbd> toggles scanlines. <kbd>R</kbd> restarts after game over. |
 
-```bash
-# List all installed skills across all harnesses
-toktopus --skills
+Run `toktopus --help` for all flags, including `--benchmarks`, `--pet`, skill editing modes, and version information.
 
-# Inspect instructions and metadata for a specific skill
-toktopus --get-skill workflow-patterns
+## System Architecture
 
-# Append new instructions to an existing skill (creates automatic .bak backup)
-toktopus --modify-skill workflow-patterns --instruction "Always run tests before completing."
-
-# Replace a skill entirely
-toktopus --modify-skill custom-linter --instruction "Run ruff check ." --mode replace
-
-# Copy a skill from Antigravity to Claude Code
-toktopus --copy-skill workflow-patterns --to-agent claude
+```mermaid
+flowchart TD
+    CLI[CLI and keyboard loop] --> Adapters[Agent adapters]
+    Adapters --> Sources[Local logs, session files, and databases]
+    CLI --> System[Host telemetry]
+    CLI --> Config[Local configuration]
+    CLI --> Core[Pricing, limits, benchmarks, skills, and pet]
+    Adapters --> Dashboard[Rich terminal dashboard]
+    System --> Dashboard
+    Core --> Dashboard
+    CLI --> Export[JSON snapshot]
+    CLI --> TerminalGame[Terminal Space Impact]
+    CLI --> BrowserGame[Bundled browser Space Impact]
+    BrowserGame --> Canvas[Canvas, animation loop, and local storage]
 ```
 
+The terminal game is entered from the dashboard or with `--game`; the standalone browser game is opened with `--web-game`. It runs in its own browser page rather than inside the Rich terminal dashboard.
+
+<details>
+<summary><strong>Directory Structure</strong></summary>
+
+```text
+.
+├── .github/workflows/         Continuous integration
+├── assets/                    Dashboard and browser-game previews
+├── data/                      Benchmark data
+├── scripts/                   Platform installers
+├── tests/                     Unit tests
+├── toktopus/
+│   ├── adapters/              Agent-specific data readers
+│   ├── core/                  Configuration, telemetry, pricing, limits, skills, pet
+│   ├── ui/                    Rich charts, layout, and theme
+│   ├── web/space-impact.html  Self-contained browser game
+│   ├── cli.py                 CLI and terminal event loop
+│   └── game.py                Terminal game
+├── pyproject.toml             Package metadata and dependencies
+├── LICENSE
+└── README.md
+```
+
+</details>
+
+<details>
+<summary><strong>Technical Specifications</strong></summary>
+
+| Area | Implementation |
+| :--- | :--- |
+| Runtime | Python 3.9+, Rich, psutil; browser edition uses Canvas and JavaScript |
+| State | In-memory application state and JSON configuration; browser game uses local storage where available |
+| Rendering | Rich terminal layouts; isolated Canvas page for browser arcade |
+| Scheduling | Dashboard refresh defaults to 0.3 seconds; terminal arcade uses 0.04-second simulation steps; browser arcade uses `requestAnimationFrame` with capped delta time |
+| Object limits | Browser game preallocates 160 projectile and 240 particle slots; excess effects are dropped |
+| Persistence | Configuration is replaced atomically; terminal and browser high scores are stored separately |
+| Validation | Standard-library `unittest` suite; build with `python -m build` after installing `build` |
+
+</details>
+
 ---
 
-## Questions and Feedback
-
-This is a personal hobby project. If you have questions, run into bugs, or have ideas for improvements, open an issue or reach out to me directly:
-* Email: nadim.hider@outlook.com
-
----
-
-## License
-
-MIT License. See [LICENSE](LICENSE) for details.
+<div align="center">
+  <sub>Built and maintained by <a href="https://github.com/NadimHider">N4D Labs</a>.</sub>
+</div>

@@ -1,10 +1,10 @@
-import os
 import json
+import os
 import sqlite3
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 from toktopus.adapters.base import BaseAgentAdapter
 
@@ -66,7 +66,7 @@ class AntigravityAdapter(BaseAgentAdapter):
         if not self.ag_dir.exists():
             self.ag_dir = self._find_ag_dir()
 
-        # 1. Try querying conversation_summaries.db for active sessions matching cwd
+
         db_path = self.ag_dir / "conversation_summaries.db"
         if db_path.exists():
             conn = None
@@ -83,7 +83,7 @@ class AntigravityAdapter(BaseAgentAdapter):
                         self._last_session_check = now
                         return self._cached_session_id
 
-                # Match by not_fully_idle
+
                 cur.execute("SELECT conversation_id FROM conversation_summaries WHERE not_fully_idle = 1 AND killed = 0 ORDER BY last_modified_time DESC LIMIT 1;")
                 r = cur.fetchone()
                 if r and r[0]:
@@ -103,7 +103,7 @@ class AntigravityAdapter(BaseAgentAdapter):
         if not brain_dir.exists():
             return None
 
-        # Sort conversation directories by actual transcript modification time
+
         try:
             candidates: List[tuple] = []
             for d in brain_dir.iterdir():
@@ -195,7 +195,7 @@ class AntigravityAdapter(BaseAgentAdapter):
         full_path = log_dir / "transcript_full.jsonl"
         transcript_path = compact_path if compact_path.exists() else full_path
 
-        # If transcript path switched between compact and full, reset cached offset
+
         if self._active_transcript_path and self._active_transcript_path != transcript_path:
             self._reset_cache()
         self._active_transcript_path = transcript_path
@@ -209,7 +209,7 @@ class AntigravityAdapter(BaseAgentAdapter):
                 last_modified = st.st_mtime
                 is_active = (time.time() - last_modified) < 120
 
-                # Fast path: return cached payload if transcript file size and mtime are unchanged
+
                 if (
                     self._cached_telemetry is not None
                     and st.st_mtime == self._last_file_mtime
@@ -220,7 +220,7 @@ class AntigravityAdapter(BaseAgentAdapter):
                     self._cached_telemetry["session_elapsed_sec"] = elapsed
                     return self._cached_telemetry
 
-                # If file was truncated or rotated, reset incremental counters
+
                 if st.st_size < self._last_file_size:
                     self._reset_cache()
 
@@ -236,9 +236,9 @@ class AntigravityAdapter(BaseAgentAdapter):
                         line = f.readline()
                         if not line:
                             break
-                        # Guard against partially flushed lines: only commit if line ends with newline
+
                         if not line.endswith("\n") and not line.endswith("\r"):
-                            # Incomplete trailing line, rewind to line start and stop
+
                             f.seek(line_start_pos)
                             break
 
@@ -260,7 +260,7 @@ class AntigravityAdapter(BaseAgentAdapter):
                             self._total_cache += cache_tok
                             self._total_reasoning += reason_tok
 
-                            # Track first turn timestamp as session start time
+
                             created_str = s.get("created_at")
                             if created_str:
                                 try:
@@ -306,7 +306,7 @@ class AntigravityAdapter(BaseAgentAdapter):
                             self._steps.append(step_info)
                             bytes_parsed = f.tell()
                         except Exception:
-                            # If corrupted line, skip it and advance
+
                             bytes_parsed = f.tell()
                             continue
 
@@ -326,7 +326,7 @@ class AntigravityAdapter(BaseAgentAdapter):
         total_session_tokens = self._total_input + self._total_output + self._total_cache + self._total_reasoning
         avg_tokens_per_step = int(total_session_tokens / step_count) if step_count > 0 else 0
 
-        # Calculate throughput using real output tokens and turn duration when active
+
         tokens_per_sec = 0
         if is_active:
             if self._steps:
@@ -351,7 +351,7 @@ class AntigravityAdapter(BaseAgentAdapter):
 
         elapsed_sec = max(0.0, time.time() - self._session_start_time) if self._session_start_time > 0 else 0.0
 
-        # Remove fake fallback subagents
+
         active_subagents = self._subagents[-4:] if self._subagents else []
 
         self._cached_telemetry = {

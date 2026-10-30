@@ -1,9 +1,6 @@
-"""
-Non-blocking cross-platform keyboard input handler for toktopus.
-"""
+
 
 import sys
-import os
 
 try:
     import msvcrt
@@ -11,13 +8,13 @@ try:
 except ImportError:
     WINDOWS = False
     import select
-    import tty
     import termios
+    import tty
 
 _ORIGINAL_TERMIOS = None
 
 def init_keyboard():
-    """Put terminal into non-blocking cbreak mode on Unix if interactive."""
+    pass
     global _ORIGINAL_TERMIOS
     if not WINDOWS and sys.stdin.isatty():
         try:
@@ -27,7 +24,7 @@ def init_keyboard():
             _ORIGINAL_TERMIOS = None
 
 def restore_keyboard():
-    """Restore original terminal attributes on Unix."""
+    pass
     global _ORIGINAL_TERMIOS
     if not WINDOWS and _ORIGINAL_TERMIOS is not None and sys.stdin.isatty():
         try:
@@ -37,21 +34,21 @@ def restore_keyboard():
         _ORIGINAL_TERMIOS = None
 
 def get_pressed_key() -> str:
-    """Check if a key has been pressed without blocking. Return key char or empty string."""
+    pass
     if WINDOWS:
         if msvcrt.kbhit():
             ch = msvcrt.getch()
             try:
-                # Handle special keys / function keys
+
                 if ch in (b'\x00', b'\xe0'):
-                    msvcrt.getch()  # consume secondary code
+                    msvcrt.getch()
                     return ""
                 return ch.decode("utf-8", errors="ignore").lower()
             except Exception:
                 return ""
         return ""
     else:
-        # Unix/macOS non-blocking read
+
         try:
             rlist, _, _ = select.select([sys.stdin], [], [], 0)
             if rlist:

@@ -1,12 +1,13 @@
 import time
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
-from toktopus.adapters.base import BaseAgentAdapter
+from typing import Dict, List, Tuple
+
 from toktopus.adapters.antigravity import AntigravityAdapter
+from toktopus.adapters.base import BaseAgentAdapter
 from toktopus.adapters.claude import ClaudeCodeAdapter
-from toktopus.adapters.opencode import OpenCodeAdapter
-from toktopus.adapters.cursor import CursorAdapter
 from toktopus.adapters.codex import CodexAdapter
+from toktopus.adapters.cursor import CursorAdapter
+from toktopus.adapters.opencode import OpenCodeAdapter
 from toktopus.adapters.pi import PiAgentAdapter
 from toktopus.core.system import get_system_telemetry
 
@@ -36,7 +37,7 @@ def _get_agent_recency(name: str, adapter: BaseAgentAdapter) -> float:
         if name == "antigravity":
             sid = adapter.get_active_session_id()
             if sid:
-                ag = adapter  # type: ignore
+                ag = adapter
                 t1 = ag.ag_dir / "brain" / sid / ".system_generated" / "logs" / "transcript.jsonl"
                 if t1.exists():
                     return t1.stat().st_mtime
@@ -49,12 +50,12 @@ def _get_agent_recency(name: str, adapter: BaseAgentAdapter) -> float:
             mtime = 0.0
             if c_json.exists():
                 mtime = max(mtime, c_json.stat().st_mtime)
-            files = adapter._scan_recent_log_files()  # type: ignore
+            files = adapter._scan_recent_log_files()
             if files:
                 mtime = max(mtime, files[0].stat().st_mtime)
             return mtime
         elif name == "opencode":
-            op = adapter  # type: ignore
+            op = adapter
             if op._db_path and op._db_path.exists():
                 return op._db_path.stat().st_mtime
         elif name == "codex":
@@ -92,14 +93,14 @@ def auto_detect_active_agent() -> str:
             if mtime > 0:
                 recent_candidates.append((name, mtime))
 
-    # 1. Recency first: if an agent had session activity in the last 180 seconds, pick it
+
     if recent_candidates:
         recent_candidates.sort(key=lambda x: x[1], reverse=True)
         top_name, top_mtime = recent_candidates[0]
         if (now - top_mtime) < 180:
             return top_name
 
-    # 2. Check running processes
+
     sys_telemetry = get_system_telemetry()
     ai_procs = sys_telemetry.get("ai_processes", [])
     for p in ai_procs:
@@ -115,7 +116,7 @@ def auto_detect_active_agent() -> str:
         elif "copilot" in lbl or "codex" in lbl:
             return "codex"
 
-    # 3. Overall most recent session data
+
     if recent_candidates:
         return recent_candidates[0][0]
 

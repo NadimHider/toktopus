@@ -1,9 +1,9 @@
-import os
 import json
+import os
 import sqlite3
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 from toktopus.adapters.base import BaseAgentAdapter
 
@@ -138,7 +138,7 @@ class OpenCodeAdapter(BaseAgentAdapter):
             conn = sqlite3.connect(f"file:{self._db_path.as_posix()}?mode=ro", uri=True, timeout=1.0)
             cur = conn.cursor()
 
-            # Query available columns in session_v2 dynamically
+
             cur.execute("PRAGMA table_info(session_v2);")
             cols = [c[1] for c in cur.fetchall()]
 
@@ -199,7 +199,7 @@ class OpenCodeAdapter(BaseAgentAdapter):
                 if t_create and t_update:
                     elapsed_sec = max(0.0, (t_update - t_create) / 1000.0)
 
-                # Query messages for this session
+
                 cur.execute("""
                     SELECT type, seq, time_created, data
                     FROM session_message
@@ -221,7 +221,7 @@ class OpenCodeAdapter(BaseAgentAdapter):
                             for a in d.get("agents", []):
                                 if a:
                                     tools.append(str(a))
-                            # Extract tokens from message if available
+
                             usage = d.get("usage") or d.get("tokens") or {}
                             if isinstance(usage, dict):
                                 in_msg = usage.get("input", 0) or usage.get("prompt_tokens", 0)
@@ -266,7 +266,7 @@ class OpenCodeAdapter(BaseAgentAdapter):
         total_tokens = total_in + total_out + total_reasoning + total_cache
         avg_tokens_per_step = int(total_tokens / len(recent_steps)) if recent_steps else 0
 
-        # Calculate throughput
+
         tok_per_sec = 0
         if is_active:
             if step_burns:

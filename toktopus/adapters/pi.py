@@ -1,9 +1,11 @@
-import os
 import json
+import os
 import time
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, Optional
+
 from toktopus.adapters.base import BaseAgentAdapter
+
 
 class PiAgentAdapter(BaseAgentAdapter):
     def __init__(self):
@@ -63,7 +65,7 @@ class PiAgentAdapter(BaseAgentAdapter):
         step_burns = [2000, 4500, 8000]
         recent_steps = []
 
-        # Inspect pi directories
+
         for d in self.pi_dirs:
             if not d.exists():
                 continue
@@ -92,7 +94,7 @@ class PiAgentAdapter(BaseAgentAdapter):
                 except Exception:
                     pass
 
-        # If total tokens zero, use estimated baseline
+
         if total_in == 0 and total_out == 0:
             total_in = 18_500
             total_out = 3_200

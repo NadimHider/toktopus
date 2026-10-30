@@ -1,5 +1,7 @@
 import unittest
-from toktopus.core.system import get_system_telemetry, _scan_gpu_telemetry
+
+from toktopus.core.system import _scan_gpu_telemetry, get_system_telemetry
+
 
 class TestSystem(unittest.TestCase):
     def test_system_telemetry(self):
@@ -11,7 +13,7 @@ class TestSystem(unittest.TestCase):
         self.assertIn("gpu", sys_data)
         self.assertGreaterEqual(sys_data["host_ram_total_gb"], 1.0)
 
-        # Extended telemetry fields
+
         self.assertIn("cpu_freq_mhz", sys_data)
         self.assertIn("cpu_cores_logical", sys_data)
         self.assertIn("cpu_cores_physical", sys_data)
@@ -27,7 +29,7 @@ class TestSystem(unittest.TestCase):
         self.assertGreaterEqual(sys_data["cpu_cores_logical"], 1)
 
     def test_gpu_scan_safe_execution(self):
-        # Should execute safely and return None or valid GPU dict
+
         gpu_result = _scan_gpu_telemetry()
         if gpu_result is not None:
             self.assertIn("gpu_util_percent", gpu_result)

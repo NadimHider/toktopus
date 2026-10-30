@@ -1,10 +1,10 @@
-import time
 import random
-from typing import List, Dict, Any, Optional
-from rich.panel import Panel
-from rich.text import Text
-from rich.table import Table
+import time
+from typing import Any, Dict, List, Optional
+
 from rich import box
+from rich.panel import Panel
+from rich.table import Table
 
 OCTO_FRAMES = {
     "idle_1": [
@@ -13,7 +13,7 @@ OCTO_FRAMES = {
         r"(|    v    |)",
         r" /| \___/ |\ ",
         r"(~\ /~\ /~/ )",
-        r" \~'   '~/   "
+        r" \~'   '~/   ",
     ],
     "idle_2": [
         r"  .-------.  ",
@@ -21,7 +21,7 @@ OCTO_FRAMES = {
         r"(|    ~    |)",
         r" /| \___/ |\ ",
         r"(~\ /~\ /~/ )",
-        r"  \~' '~/    "
+        r"  \~' '~/    ",
     ],
     "coding_1": [
         r"  .-------.  ",
@@ -29,7 +29,7 @@ OCTO_FRAMES = {
         r"(|   ===   |)",
         r" /|\/~~~\/|\ ",
         r"(~\~/   \~/~)",
-        r" \~'     '~/ "
+        r" \~'     '~/ ",
     ],
     "coding_2": [
         r"  .-------.  ",
@@ -37,7 +37,7 @@ OCTO_FRAMES = {
         r"(|   ~~~   |)",
         r" /|\/~~~\/|\ ",
         r"(~\~/   \~/~)",
-        r"  \~'   '~/  "
+        r"  \~'   '~/  ",
     ],
     "cache_high": [
         r"  .-------.  ",
@@ -45,7 +45,7 @@ OCTO_FRAMES = {
         r"(|    ▽    |)",
         r" /| \___/ |\ ",
         r"(~\ /~\ /~/ )",
-        r" \~'     '~/ "
+        r" \~'     '~/ ",
     ],
     "pet": [
         r"  .-------.  ",
@@ -53,7 +53,7 @@ OCTO_FRAMES = {
         r"(|   <3    |)",
         r" /| \___/ |\ ",
         r"(~\ /~\ /~/ )",
-        r"  \~' '~/    "
+        r"  \~' '~/    ",
     ],
     "eating": [
         r"  .-------.  ",
@@ -61,7 +61,7 @@ OCTO_FRAMES = {
         r"(|    w    |)",
         r" /|\/~~~\/|\ ",
         r"(~\~/ * \~/~)",
-        r" \~'     '~/ "
+        r" \~'     '~/ ",
     ],
     "sleeping": [
         r"  .-------. z",
@@ -69,7 +69,7 @@ OCTO_FRAMES = {
         r"(|    o    |)",
         r" /| \___/ |\ ",
         r"(~\ /~\ /~/ )",
-        r" \~'     '~/ "
+        r" \~'     '~/ ",
     ],
     "hungry": [
         r"  .-------.  ",
@@ -77,8 +77,8 @@ OCTO_FRAMES = {
         r"(|    ~    |)",
         r" /| \___/ |\ ",
         r"( )  ( ) ( ) ",
-        r"  '       '  "
-    ]
+        r"  '       '  ",
+    ],
 }
 
 AUTONOMOUS_QUIPS = [
@@ -93,8 +93,9 @@ AUTONOMOUS_QUIPS = [
     "i love fast inference.",
     "keep the tokens flowing!",
     "cache hit ratio looking elite today.",
-    "more context, more power!"
+    "more context, more power!",
 ]
+
 
 class CyberPet:
     def __init__(self, name: str = "Tokto"):
@@ -153,43 +154,44 @@ class CyberPet:
         tokens_per_sec: int,
         cache_eff: float,
         current_ctx: int,
-        total_tokens: int
+        total_tokens: int,
     ):
         self.tick_counter += 1
 
-        # Track tokens digested
         if total_tokens > self.tokens_digested:
             delta = total_tokens - self.tokens_digested
             self.tokens_digested = total_tokens
-            # Gain XP from tokens
+
             if delta > 1000:
                 self.add_xp(max(1, delta // 50000))
 
-        # Handle temporary action states (eating, pet)
         if self.action_timer > 0:
             self.action_timer -= 1
         else:
-            # Autonomous state decision
             if is_active or tokens_per_sec > 50:
                 self.state = "coding"
-                self.fuel = max(0, self.fuel - 1 if self.tick_counter % 30 == 0 else self.fuel)
+                self.fuel = max(
+                    0, self.fuel - 1 if self.tick_counter % 30 == 0 else self.fuel
+                )
             elif cache_eff >= 80.0 and current_ctx > 10000:
                 self.state = "cache_high"
             elif self.fuel <= 20:
                 self.state = "hungry"
-            elif not is_active and self.tick_counter > 200 and (self.tick_counter % 120 < 60):
+            elif (
+                not is_active
+                and self.tick_counter > 200
+                and (self.tick_counter % 120 < 60)
+            ):
                 self.state = "sleeping"
             else:
                 self.state = "idle"
 
-        # Slow happiness / fuel drift
         if self.tick_counter % 60 == 0:
             if self.fuel > 0:
                 self.fuel = max(0, self.fuel - 1)
             else:
                 self.happiness = max(10, self.happiness - 2)
 
-        # Autonomous speech bubble updates
         self.quip_timer -= 1
         if self.quip_timer <= 0:
             if self.state == "hungry":
@@ -204,7 +206,6 @@ class CyberPet:
                 self.current_quip = random.choice(AUTONOMOUS_QUIPS)
             self.quip_timer = random.randint(45, 90)
 
-        # Update floating bubbles
         if self.tick_counter % 2 == 0:
             for b in self.bubbles:
                 b["y"] -= 1
@@ -233,7 +234,6 @@ class CyberPet:
     def render_widget(self, width: int = 34) -> Panel:
         sprite = self.get_current_sprite()
 
-        # Mood badge and style
         mood_map = {
             "idle": ("CHILL", "#00f3ff"),
             "coding": ("STREAMING", "#ffe600"),
@@ -241,70 +241,78 @@ class CyberPet:
             "eating": ("FEASTING", "#00ff88"),
             "pet": ("LOVED", "#ff3366"),
             "sleeping": ("SLEEPING", "#b026ff"),
-            "hungry": ("HUNGRY", "#ff3366")
+            "hungry": ("HUNGRY", "#ff3366"),
         }
         mood_name, mood_color = mood_map.get(self.state, ("HAPPY", "#00f3ff"))
 
-        # Build Mini Bar Gauges
-        def _mini_bar(val: int, max_val: int = 100, length: int = 8, color: str = "#00ff88") -> str:
+        def _mini_bar(
+            val: int, max_val: int = 100, length: int = 8, color: str = "#00ff88"
+        ) -> str:
             filled = max(0, min(length, int((val / max_val) * length)))
             empty = length - filled
             return f"[{color}]{'█' * filled}[/{color}][dim]{'░' * empty}[/dim] {val}%"
 
-        fuel_gauge = _mini_bar(self.fuel, 100, length=6, color="#ffe600" if self.fuel < 35 else "#00ff88")
-        joy_gauge = _mini_bar(self.happiness, 100, length=6, color="#ff3366" if self.happiness < 35 else "#00f3ff")
+        fuel_gauge = _mini_bar(
+            self.fuel, 100, length=6, color="#ffe600" if self.fuel < 35 else "#00ff88"
+        )
+        joy_gauge = _mini_bar(
+            self.happiness,
+            100,
+            length=6,
+            color="#ff3366" if self.happiness < 35 else "#00f3ff",
+        )
         needed_xp = self.level * 100
         xp_gauge = _mini_bar(self.xp, needed_xp, length=6, color="#b026ff")
 
-        # Layout inside pet box
         content = Table.grid(padding=(0, 1), expand=True)
         content.add_column("pet", justify="left")
         content.add_column("info", justify="left")
 
-        # Format sprite with neon colors
         color_tag = mood_color
         colored_sprite = [f"[{color_tag}]{line}[/{color_tag}]" for line in sprite]
 
-        # Info lines on right side
         quip_text = self.current_quip[:32]
         info_lines = [
             f"[bold white]{self.name}[/bold white] [dim](Lv.{self.level})[/dim] [{mood_color}][{mood_name}][/{mood_color}]",
             f"[dim]XP  :[/dim] {xp_gauge}",
             f"[dim]Fuel:[/dim] {fuel_gauge}",
             f"[dim]Joy :[/dim] {joy_gauge}",
-            f"[#00ff88]\"{quip_text}\"[/#00ff88]",
-            f"[bold #00f3ff][F][/bold #00f3ff][dim]Feed [/dim][bold #ff3366][T][/bold #ff3366][dim]Pet [/dim][bold #ffe600][O][/bold #ffe600][dim]Lounge[/dim]"
+            f'[#00ff88]"{quip_text}"[/#00ff88]',
+            "[bold #00f3ff][F][/bold #00f3ff][dim]Feed [/dim][bold #ff3366][T][/bold #ff3366][dim]Pet [/dim][bold #ffe600][O][/bold #ffe600][dim]Lounge[/dim]",
         ]
 
-        # Combine rows
         for i in range(max(len(colored_sprite), len(info_lines))):
             s_part = colored_sprite[i] if i < len(colored_sprite) else "           "
             i_part = info_lines[i] if i < len(info_lines) else ""
             content.add_row(s_part, i_part)
 
-        title = f"[bold #00f3ff][TOKTO : COMPANION][/bold #00f3ff]"
+        title = "[bold #00f3ff][TOKTO : COMPANION][/bold #00f3ff]"
         return Panel(
             content,
             title=title,
             border_style=mood_color,
             box=box.ROUNDED,
-            padding=(0, 1)
+            padding=(0, 1),
         )
 
-# Global pet instance for state persistence across dashboard cycles
+
 _GLOBAL_PET = CyberPet("Tokto")
+
 
 def get_cyber_pet() -> CyberPet:
     global _GLOBAL_PET
     return _GLOBAL_PET
 
+
 def run_pet_lounge():
+    import sys
+
     from rich.console import Console
     from rich.live import Live
-    import sys
 
     try:
         import msvcrt
+
         WINDOWS = True
     except ImportError:
         WINDOWS = False
@@ -318,15 +326,21 @@ def run_pet_lounge():
                 ch = msvcrt.getch()
                 if ch in (b"\x00", b"\xe0"):
                     ch2 = msvcrt.getch()
-                    if ch2 == b"H": return "up"
-                    elif ch2 == b"P": return "down"
-                    elif ch2 == b"K": return "left"
-                    elif ch2 == b"M": return "right"
+                    if ch2 == b"H":
+                        return "up"
+                    elif ch2 == b"P":
+                        return "down"
+                    elif ch2 == b"K":
+                        return "left"
+                    elif ch2 == b"M":
+                        return "right"
                     return None
                 try:
                     decoded = ch.decode("utf-8", errors="ignore").lower()
-                    if decoded == " ": return "space"
-                    elif decoded == "\x1b": return "esc"
+                    if decoded == " ":
+                        return "space"
+                    elif decoded == "\x1b":
+                        return "esc"
                     return decoded
                 except Exception:
                     return None
@@ -336,8 +350,10 @@ def run_pet_lounge():
             if dr:
                 try:
                     ch = sys.stdin.read(1)
-                    if ch == "\x1b": return "esc"
-                    elif ch == " ": return "space"
+                    if ch == "\x1b":
+                        return "esc"
+                    elif ch == " ":
+                        return "space"
                     return ch.lower()
                 except Exception:
                     return None
@@ -351,7 +367,10 @@ def run_pet_lounge():
     pet_x = tank_w // 2 - 5
     pet_y = tank_h // 2 - 2
     snacks = []
-    bubbles = [{"x": random.randint(2, tank_w - 3), "y": random.randint(1, tank_h - 2)} for _ in range(8)]
+    bubbles = [
+        {"x": random.randint(2, tank_w - 3), "y": random.randint(1, tank_h - 2)}
+        for _ in range(8)
+    ]
     banner_msg = "Welcome to Tokto's Cyber Habitat! [F] Drop Token Snack  [T] Pet  [W/A/S/D] Swim  [Q] Exit"
 
     old_term = None
@@ -372,10 +391,14 @@ def run_pet_lounge():
                 elif k in ("f", "space"):
                     snacks.append({"x": random.randint(pet_x - 3, pet_x + 8), "y": 1})
                     pet.feed()
-                    banner_msg = "You dropped a crunchy token snack! Tokto is overjoyed!"
+                    banner_msg = (
+                        "You dropped a crunchy token snack! Tokto is overjoyed!"
+                    )
                 elif k == "t":
                     pet.pet()
-                    banner_msg = "You gave Tokto gentle scratches! Tokto wiggles with happiness!"
+                    banner_msg = (
+                        "You gave Tokto gentle scratches! Tokto wiggles with happiness!"
+                    )
                 elif k in ("w", "up"):
                     pet_y = max(1, pet_y - 1)
                 elif k in ("s", "down"):
@@ -385,27 +408,32 @@ def run_pet_lounge():
                 elif k in ("d", "right"):
                     pet_x = min(tank_w - 14, pet_x + 2)
 
-                # Update simulation
-                pet.tick(is_active=False, tokens_per_sec=0, cache_eff=95.0, current_ctx=50000, total_tokens=100000)
+                pet.tick(
+                    is_active=False,
+                    tokens_per_sec=0,
+                    cache_eff=95.0,
+                    current_ctx=50000,
+                    total_tokens=100000,
+                )
 
-                # Move snacks down
                 rem_snacks = []
                 for sn in snacks:
                     sn["y"] += 1
-                    if abs(sn["x"] - (pet_x + 5)) <= 4 and abs(sn["y"] - (pet_y + 2)) <= 2:
+                    if (
+                        abs(sn["x"] - (pet_x + 5)) <= 4
+                        and abs(sn["y"] - (pet_y + 2)) <= 2
+                    ):
                         pet.feed()
                     elif sn["y"] < tank_h - 1:
                         rem_snacks.append(sn)
                 snacks = rem_snacks
 
-                # Move bubbles up
                 for b in bubbles:
                     b["y"] -= 1
                     if b["y"] <= 0:
                         b["y"] = tank_h - 2
                         b["x"] = random.randint(2, tank_w - 3)
 
-                # Render 2D aquarium
                 grid = [[" " for _ in range(tank_w)] for _ in range(tank_h)]
                 for x in range(tank_w):
                     grid[0][x] = "="
@@ -418,22 +446,18 @@ def run_pet_lounge():
                 grid[tank_h - 1][0] = "+"
                 grid[tank_h - 1][tank_w - 1] = "+"
 
-                # Sea floor plants
                 for px in range(2, tank_w - 2, 7):
                     grid[tank_h - 2][px] = "§"
                     grid[tank_h - 3][px] = "~"
 
-                # Bubbles
                 for b in bubbles:
                     if 0 < b["y"] < tank_h - 1 and 0 < b["x"] < tank_w - 1:
                         grid[b["y"]][b["x"]] = "o"
 
-                # Snacks
                 for sn in snacks:
                     if 0 < sn["y"] < tank_h - 1 and 0 < sn["x"] < tank_w - 1:
                         grid[sn["y"]][sn["x"]] = "*"
 
-                # Draw Pet
                 sprite = pet.get_current_sprite()
                 for sy, s_line in enumerate(sprite):
                     gy = pet_y + sy
@@ -447,7 +471,7 @@ def run_pet_lounge():
                 hud = (
                     f" :: TOKTO PET LOUNGE :: Level {pet.level} | Fuel: {pet.fuel}% | Joy: {pet.happiness}% | "
                     f"Tokens Digested: {pet.tokens_digested:,} ::\n"
-                    f" Mood: [{pet.state.upper()}]  \"{pet.current_quip}\"\n"
+                    f' Mood: [{pet.state.upper()}]  "{pet.current_quip}"\n'
                 )
                 controls = f"\n {banner_msg}"
                 live.update(hud + "\n".join(lines) + controls, refresh=True)
@@ -461,4 +485,6 @@ def run_pet_lounge():
             except Exception:
                 pass
         console.clear()
-        console.print(f"[bold #00f3ff]:: Returning from Tokto Pet Lounge ::[/bold #00f3ff]")
+        console.print(
+            "[bold #00f3ff]:: Returning from Tokto Pet Lounge ::[/bold #00f3ff]"
+        )

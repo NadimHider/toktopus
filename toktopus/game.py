@@ -1,7 +1,7 @@
+import random
 import sys
 import time
-import random
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 try:
     import msvcrt
@@ -16,7 +16,7 @@ def _get_key_nonblocking() -> Optional[str]:
     if WINDOWS:
         if msvcrt.kbhit():
             ch = msvcrt.getch()
-            # Handle special keys (arrows, function keys)
+
             if ch in (b"\x00", b"\xe0"):
                 ch2 = msvcrt.getch()
                 if ch2 == b"H":
@@ -39,13 +39,13 @@ def _get_key_nonblocking() -> Optional[str]:
                 return None
         return None
     else:
-        # POSIX non-blocking key read
+
         dr, _, _ = select.select([sys.stdin], [], [], 0)
         if dr:
             try:
                 ch = sys.stdin.read(1)
                 if ch == "\x1b":
-                    # Check for arrow sequence
+
                     dr2, _, _ = select.select([sys.stdin], [], [], 0.01)
                     if dr2:
                         seq = sys.stdin.read(2)
@@ -87,18 +87,19 @@ class SpaceImpactGame:
         self.particles: List[Dict[str, Any]] = []
         self.tick_count = 0
         self.boss_active = False
+        self.next_boss_score = 400
 
     def spawn_entities(self):
         self.tick_count += 1
 
-        # Periodic enemy spawns
+
         spawn_rate = max(6, 18 - (self.wave * 2))
         if self.tick_count % spawn_rate == 0 and not self.boss_active:
             ey = random.randint(1, self.height - 2)
             roll = random.random()
 
             if roll < 0.50:
-                # Scout alien (1 HP, fast)
+
                 self.enemies.append({
                     "x": self.width - 4,
                     "y": ey,
@@ -111,7 +112,7 @@ class SpaceImpactGame:
                     "color": "#00ff88"
                 })
             elif roll < 0.80:
-                # Interceptor alien (2 HP, diagonal motion)
+
                 self.enemies.append({
                     "x": self.width - 4,
                     "y": ey,
@@ -125,7 +126,7 @@ class SpaceImpactGame:
                     "color": "#ffe600"
                 })
             elif roll < 0.92:
-                # Heavy Fighter (3 HP, shoots bullets)
+
                 self.enemies.append({
                     "x": self.width - 5,
                     "y": ey,
@@ -139,7 +140,7 @@ class SpaceImpactGame:
                     "color": "#ff3366"
                 })
             else:
-                # Asteroid obstacle (blocks lasers)
+
                 self.enemies.append({
                     "x": self.width - 4,
                     "y": ey,
@@ -152,9 +153,10 @@ class SpaceImpactGame:
                     "color": "dim"
                 })
 
-        # Spawn boss every 400 points if none currently active
-        if self.score > 0 and (self.score % 400 < 50) and not self.boss_active and self.tick_count > 100:
+
+        if self.score >= self.next_boss_score and not self.boss_active and self.tick_count > 100:
             self.boss_active = True
+            self.next_boss_score += 400
             self.enemies.append({
                 "x": self.width - 12,
                 "y": self.height // 2,
@@ -189,7 +191,7 @@ class SpaceImpactGame:
         if self.paused:
             return
 
-        # Player Movement
+
         if key in ("w", "up"):
             if self.player_y > 1:
                 self.player_y -= 1
@@ -206,7 +208,7 @@ class SpaceImpactGame:
             self.fire_laser()
 
     def fire_laser(self):
-        # Limit max active lasers
+
         if len(self.lasers) < 8:
             self.lasers.append({
                 "x": self.player_x + 2,
@@ -219,15 +221,15 @@ class SpaceImpactGame:
         if self.game_over or self.paused:
             return
 
-        # 1. Update lasers
+
         remaining_lasers = []
-        for l in self.lasers:
-            l["x"] += l["speed"]
-            if l["x"] < self.width - 2:
-                remaining_lasers.append(l)
+        for laser in self.lasers:
+            laser["x"] += laser["speed"]
+            if laser["x"] < self.width - 2:
+                remaining_lasers.append(laser)
         self.lasers = remaining_lasers
 
-        # 2. Update enemy bullets
+
         remaining_eb = []
         for eb in self.enemy_bullets:
             eb["x"] -= eb.get("speed", 1)
@@ -235,14 +237,14 @@ class SpaceImpactGame:
                 remaining_eb.append(eb)
         self.enemy_bullets = remaining_eb
 
-        # 3. Update enemies
+
         remaining_enemies = []
         for e in self.enemies:
-            # Horizontal motion
+
             if self.tick_count % 2 == 0:
                 e["x"] -= e.get("speed", 1)
 
-            # Vertical behavior
+
             if e["type"] == "interceptor":
                 if self.tick_count % 3 == 0:
                     e["y"] += e.get("dir_y", 1)
@@ -262,7 +264,7 @@ class SpaceImpactGame:
                         e["y"] = self.height - 3
                         e["dir_y"] = -1
 
-            # Enemy firing
+
             if e["type"] in ("heavy", "boss"):
                 cd = e.get("shoot_cd", 10) - 1
                 if cd <= 0:
@@ -276,7 +278,7 @@ class SpaceImpactGame:
                 else:
                     e["shoot_cd"] = cd
 
-            # Keep enemy if still on playfield
+
             if e["x"] > 1:
                 remaining_enemies.append(e)
             else:
@@ -285,15 +287,15 @@ class SpaceImpactGame:
 
         self.enemies = remaining_enemies
 
-        # 4. Check collisions: Lasers vs Enemies
+
         active_lasers = []
-        for l in self.lasers:
+        for laser in self.lasers:
             hit = False
-            lx, ly = l["x"], l["y"]
+            lx, ly = laser["x"], laser["y"]
             for e in self.enemies:
                 ex, ey = e["x"], e["y"]
                 e_len = len(e["sprite"])
-                if ey == ly and (ex <= lx <= ex + e_len):
+                if e["hp"] > 0 and ey == ly and (ex <= lx < ex + e_len):
                     hit = True
                     e["hp"] -= 1
                     self.particles.append({"x": lx, "y": ly, "ttl": 2, "char": "*"})
@@ -307,13 +309,13 @@ class SpaceImpactGame:
                         self.particles.append({"x": ex, "y": ey, "ttl": 3, "char": "X"})
                     break
             if not hit:
-                active_lasers.append(l)
+                active_lasers.append(laser)
         self.lasers = active_lasers
 
-        # Clean up dead enemies
+
         self.enemies = [e for e in self.enemies if e["hp"] > 0]
 
-        # 5. Check collisions: Enemy Bullets vs Player
+
         active_eb = []
         for eb in self.enemy_bullets:
             bx, by = eb["x"], eb["y"]
@@ -324,7 +326,7 @@ class SpaceImpactGame:
                 active_eb.append(eb)
         self.enemy_bullets = active_eb
 
-        # 6. Check collisions: Enemies vs Player
+
         for e in self.enemies:
             ex, ey = e["x"], e["y"]
             e_len = len(e["sprite"])
@@ -335,7 +337,7 @@ class SpaceImpactGame:
 
         self.enemies = [e for e in self.enemies if e["hp"] > 0]
 
-        # 7. Update particles
+
         remaining_particles = []
         for p in self.particles:
             p["ttl"] -= 1
@@ -355,10 +357,10 @@ class SpaceImpactGame:
                 self.game_over = True
 
     def render_frame(self) -> str:
-        # Build 2D buffer
+
         grid = [[" " for _ in range(self.width)] for _ in range(self.height)]
 
-        # Draw borders
+
         for x in range(self.width):
             grid[0][x] = "="
             grid[self.height - 1][x] = "="
@@ -370,13 +372,13 @@ class SpaceImpactGame:
         grid[self.height - 1][0] = "+"
         grid[self.height - 1][self.width - 1] = "+"
 
-        # Draw particles
+
         for p in self.particles:
             px, py = p["x"], p["y"]
             if 0 < px < self.width - 1 and 0 < py < self.height - 1:
                 grid[py][px] = p["char"]
 
-        # Draw enemies
+
         for e in self.enemies:
             ex, ey = e["x"], e["y"]
             if 0 < ey < self.height - 1:
@@ -386,19 +388,19 @@ class SpaceImpactGame:
                     if 0 < pos_x < self.width - 1:
                         grid[ey][pos_x] = ch
 
-        # Draw lasers
-        for l in self.lasers:
-            lx, ly = l["x"], l["y"]
-            if 0 < lx < self.width - 1 and 0 < ly < self.height - 1:
-                grid[ly][lx] = l["sprite"]
 
-        # Draw enemy bullets
+        for laser in self.lasers:
+            lx, ly = laser["x"], laser["y"]
+            if 0 < lx < self.width - 1 and 0 < ly < self.height - 1:
+                grid[ly][lx] = laser["sprite"]
+
+
         for eb in self.enemy_bullets:
             bx, by = eb["x"], eb["y"]
             if 0 < bx < self.width - 1 and 0 < by < self.height - 1:
                 grid[by][bx] = eb["sprite"]
 
-        # Draw player ship (if not game over)
+
         if not self.game_over:
             px, py = self.player_x, self.player_y
             if 0 < py < self.height - 1:
@@ -409,7 +411,7 @@ class SpaceImpactGame:
 
         lines = ["".join(row) for row in grid]
 
-        # Draw HUD header
+
         hp_bar_len = 10
         filled_hp = max(0, min(hp_bar_len, int((self.player_hp / 100.0) * hp_bar_len)))
         empty_hp = hp_bar_len - filled_hp
@@ -459,11 +461,21 @@ class SpaceImpactGame:
 def run_space_impact(standalone: bool = True):
     from rich.console import Console
     from rich.live import Live
+    from rich.text import Text
+
+    from toktopus.core.config import load_config, save_config
 
     console = Console()
     game = SpaceImpactGame(width=68, height=16)
+    try:
+        game.high_score = max(0, int(load_config().get("space_impact_high_score", 0)))
+    except (TypeError, ValueError, OverflowError):
+        game.high_score = 0
+    if not sys.stdin.isatty():
+        console.print("Space Impact requires an interactive terminal.")
+        return
 
-    # In POSIX terminal, enable cbreak mode for single keystrokes
+
     old_term_settings = None
     if not WINDOWS:
         try:
@@ -475,19 +487,24 @@ def run_space_impact(standalone: bool = True):
 
     try:
         with Live(console=console, screen=True, auto_refresh=False) as live:
+            last_frame = time.monotonic()
+            accumulator = 0.0
             while True:
                 key = _get_key_nonblocking()
                 if key in ("q", "esc"):
                     break
 
                 game.handle_input(key)
-                if not game.paused and not game.game_over:
-                    game.spawn_entities()
-                    game.update()
-
-                frame_text = game.render_frame()
-                live.update(frame_text, refresh=True)
-                time.sleep(0.04)
+                now = time.monotonic()
+                accumulator = min(0.2, accumulator + now - last_frame)
+                last_frame = now
+                while accumulator >= 0.04:
+                    if not game.paused and not game.game_over:
+                        game.spawn_entities()
+                        game.update()
+                    accumulator -= 0.04
+                live.update(Text(game.render_frame()), refresh=True)
+                time.sleep(0.02)
     except KeyboardInterrupt:
         pass
     finally:
@@ -496,5 +513,6 @@ def run_space_impact(standalone: bool = True):
                 termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_term_settings)
             except Exception:
                 pass
+        save_config({"space_impact_high_score": game.high_score})
         console.clear()
         console.print(f"[bold #00f3ff]:: Space Impact finished. Final Score: {game.score} ::[/bold #00f3ff]")

@@ -1,16 +1,17 @@
-import unittest
-import tempfile
 import json
 import sqlite3
-import os
+import tempfile
+import unittest
 from pathlib import Path
-from toktopus.adapters import ADAPTERS, get_adapter, auto_detect_active_agent
+
+from toktopus.adapters import ADAPTERS, auto_detect_active_agent, get_adapter
 from toktopus.adapters.antigravity import AntigravityAdapter
 from toktopus.adapters.claude import ClaudeCodeAdapter
-from toktopus.adapters.opencode import OpenCodeAdapter
-from toktopus.adapters.cursor import CursorAdapter
 from toktopus.adapters.codex import CodexAdapter
+from toktopus.adapters.cursor import CursorAdapter
+from toktopus.adapters.opencode import OpenCodeAdapter
 from toktopus.adapters.pi import PiAgentAdapter
+
 
 class TestAdapters(unittest.TestCase):
     def test_all_adapters_registered(self):
@@ -47,20 +48,20 @@ class TestAdapters(unittest.TestCase):
             log_dir.mkdir(parents=True)
             transcript = log_dir / "transcript.jsonl"
 
-            # Write one complete line and one incomplete line without newline
+
             with open(transcript, "w", encoding="utf-8") as f:
                 f.write(json.dumps({"input_tokens": 500, "output_tokens": 100}) + "\n")
-                f.write('{"input_tokens": 300, "out')  # Incomplete line
+                f.write('{"input_tokens": 300, "out')
 
             t1 = ag.get_session_telemetry("test_session")
             self.assertEqual(t1["input_tokens"], 500)
             self.assertEqual(t1["output_tokens"], 100)
 
-            # Now complete the second line
+
             with open(transcript, "a", encoding="utf-8") as f:
                 f.write('put_tokens": 200}\n')
 
-            # Force re-read
+
             ag._last_file_size = 0
             t2 = ag.get_session_telemetry("test_session")
             self.assertEqual(t2["input_tokens"], 800)
@@ -82,7 +83,7 @@ class TestAdapters(unittest.TestCase):
                 }) + "\n")
 
             adapter._cached_files = [jsonl_file]
-            adapter._last_scan_time = 9999999999.0  # bypass rescanning
+            adapter._last_scan_time = 9999999999.0
             t = adapter.get_session_telemetry("test-session")
             self.assertEqual(t["input_tokens"], 1200)
             self.assertEqual(t["output_tokens"], 400)

@@ -1,20 +1,19 @@
-import os
-import unittest
-import tempfile
 import shutil
+import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from toktopus.core.skills import (
-    _parse_frontmatter,
+    AGENT_SKILL_PATHS,
     _build_frontmatter_text,
+    _parse_frontmatter,
+    copy_skill,
     create_skill,
     get_skill,
     modify_skill,
-    copy_skill,
-    list_installed_skills,
-    AGENT_SKILL_PATHS
 )
+
 
 class TestSkillManager(unittest.TestCase):
     def setUp(self):
@@ -94,7 +93,7 @@ class TestSkillManager(unittest.TestCase):
             self.assertIn("Initial instructions.", updated["instructions"])
             self.assertIn("Additional strict rule: no unused imports.", updated["instructions"])
 
-            # Verify backup file was created
+
             bak_file = Path(updated["skill_file"]).with_suffix(".md.bak")
             self.assertTrue(bak_file.exists())
 

@@ -1,6 +1,3 @@
-# toktopus Windows One-Liner Installer
-# Usage:
-#   irm https://raw.githubusercontent.com/NadimHider/toktopus/main/scripts/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 

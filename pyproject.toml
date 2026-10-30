@@ -1,14 +1,14 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "toktopus"
-version = "1.6.0"
+version = "1.6.1"
 description = "Real-time Terminal Activity and Token Monitor for AI Coding Agents (Antigravity, Claude Code, OpenCode, Cursor, Codex, Pi)"
 readme = "README.md"
-authors = [{ name = "Nadim Hider", email = "nadim.hider@outlook.com" }]
-license = { text = "MIT" }
+authors = [{ name = "Nadim Hider" }]
+license = "MIT"
 requires-python = ">=3.9"
 dependencies = [
     "rich>=13.0.0",
@@ -32,7 +32,6 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Topic :: System :: Monitoring",
@@ -49,3 +48,9 @@ Issues = "https://github.com/NadimHider/toktopus/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
+
+[tool.setuptools.package-data]
+toktopus = ["web/*.html"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

@@ -1,5 +1,7 @@
 import unittest
+
 from toktopus.core.skills import count_skills_and_plugins
+
 
 class TestSkills(unittest.TestCase):
     def test_count_skills_and_plugins_antigravity(self):

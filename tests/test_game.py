@@ -1,5 +1,7 @@
 import unittest
+
 from toktopus.game import SpaceImpactGame
+
 
 class TestSpaceImpactGame(unittest.TestCase):
     def setUp(self):
@@ -16,21 +18,21 @@ class TestSpaceImpactGame(unittest.TestCase):
         self.assertFalse(self.game.paused)
 
     def test_player_movement_bounds(self):
-        # Move up
+
         orig_y = self.game.player_y
         self.game.handle_input("up")
         self.assertEqual(self.game.player_y, max(1, orig_y - 1))
 
-        # Move down
+
         self.game.handle_input("down")
         self.assertEqual(self.game.player_y, orig_y)
 
-        # Move right
+
         orig_x = self.game.player_x
         self.game.handle_input("right")
         self.assertEqual(self.game.player_x, orig_x + 1)
 
-        # Move left
+
         self.game.handle_input("left")
         self.assertEqual(self.game.player_x, orig_x)
 
@@ -45,7 +47,7 @@ class TestSpaceImpactGame(unittest.TestCase):
     def test_laser_movement_and_culling(self):
         self.game.handle_input("space")
         self.assertEqual(len(self.game.lasers), 1)
-        # Advance ticks until laser reaches screen edge
+
         for _ in range(40):
             self.game.update()
         self.assertEqual(len(self.game.lasers), 0)
@@ -57,7 +59,7 @@ class TestSpaceImpactGame(unittest.TestCase):
         self.assertGreater(len(self.game.enemies), 0)
 
     def test_laser_hits_enemy(self):
-        # Place enemy directly in front of player
+
         self.game.enemies.append({
             "x": self.game.player_x + 4,
             "y": self.game.player_y,
@@ -70,10 +72,10 @@ class TestSpaceImpactGame(unittest.TestCase):
             "color": "green"
         })
         self.game.handle_input("space")
-        # Update simulation: laser advances by 2 each tick
+
         self.game.update()
         self.game.update()
-        # Enemy should be destroyed and score awarded
+
         self.assertEqual(self.game.score, 15)
         self.assertEqual(len(self.game.enemies), 0)
 
@@ -82,12 +84,12 @@ class TestSpaceImpactGame(unittest.TestCase):
         self.assertEqual(self.game.player_hp, 50)
         self.assertEqual(self.game.player_lives, 3)
 
-        # Lethal damage takes one life
+
         self.game.take_player_damage(60)
         self.assertEqual(self.game.player_lives, 2)
         self.assertEqual(self.game.player_hp, 100)
 
-        # Deplete all lives
+
         self.game.take_player_damage(100)
         self.game.take_player_damage(100)
         self.assertTrue(self.game.game_over)

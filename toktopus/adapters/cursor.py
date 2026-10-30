@@ -1,9 +1,9 @@
-import os
 import json
+import os
 import sqlite3
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 from toktopus.adapters.base import BaseAgentAdapter
 from toktopus.core.system import get_system_telemetry
@@ -34,14 +34,14 @@ class CursorAdapter(BaseAgentAdapter):
             cand_global = base / "User" / "globalStorage" / "state.vscdb"
             if cand_global.exists():
                 return cand_global
-            # Also check direct globalStorage
+
             direct_cand = base / "globalStorage" / "state.vscdb"
             if direct_cand.exists():
                 return direct_cand
         return None
 
     def get_active_session_id(self) -> Optional[str]:
-        # Check tracking db
+
         tracking_db = Path.home() / ".cursor" / "ai-tracking" / "ai-code-tracking.db"
         if tracking_db.exists():
             conn = None
@@ -79,7 +79,7 @@ class CursorAdapter(BaseAgentAdapter):
         recent_steps: List[Dict[str, Any]] = []
         last_modified = 0.0
 
-        # 1. Check ai-code-tracking.db for session and model
+
         tracking_db = Path.home() / ".cursor" / "ai-tracking" / "ai-code-tracking.db"
         if tracking_db.exists():
             conn = None
@@ -99,12 +99,12 @@ class CursorAdapter(BaseAgentAdapter):
                     if m_val and str(m_val).lower() not in ("false", "true", "none"):
                         model_name = f"{m_val} (Cursor)"
 
-                # Count distinct generations
+
                 cur.execute("SELECT COUNT(*) FROM ai_code_hashes WHERE conversationId = ?;", (sid,))
                 cnt_row = cur.fetchone()
                 gen_count = cnt_row[0] if cnt_row else 0
                 if gen_count > 0:
-                    # Rough token estimation based on generated chunks
+
                     total_out = gen_count * 150
                     total_in = gen_count * 800
                     active_context = total_in
@@ -118,7 +118,7 @@ class CursorAdapter(BaseAgentAdapter):
                     except Exception:
                         pass
 
-        # 2. Check state.vscdb for configured active model
+
         if vscdb_path and vscdb_path.exists():
             conn = None
             try:
@@ -130,7 +130,7 @@ class CursorAdapter(BaseAgentAdapter):
                 conn = sqlite3.connect(f"file:{vscdb_path.as_posix()}?mode=ro", uri=True, timeout=1.0)
                 c = conn.cursor()
 
-                # Check applied model config
+
                 c.execute("SELECT value FROM ItemTable WHERE key = 'cursor/applicationOpenModelAppliedConfig' LIMIT 1;")
                 m_row = c.fetchone()
                 if m_row and m_row[0]:
@@ -144,7 +144,7 @@ class CursorAdapter(BaseAgentAdapter):
                         if m_id and str(m_id).lower() not in ("false", "true", "none"):
                             model_name = f"{m_id} (Cursor)"
 
-                # Look for token tracking daily stats
+
                 c.execute("SELECT key, value FROM ItemTable WHERE key LIKE 'aiCodeTracking.dailyStats%' ORDER BY key DESC LIMIT 1;")
                 row = c.fetchone()
                 if row and row[1]:

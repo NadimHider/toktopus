@@ -1,6 +1,6 @@
 import json
 import urllib.request
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 BENCHMARK_LAST_UPDATED: str = "2026-10-25"
 

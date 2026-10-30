@@ -1,6 +1,12 @@
 import unittest
+
+from toktopus.core.benchmarks import (
+    find_model_benchmark,
+    get_benchmarks,
+    get_benchmarks_last_updated,
+)
 from toktopus.core.pricing import calculate_costs, resolve_pricing_model
-from toktopus.core.benchmarks import get_benchmarks, find_model_benchmark, get_benchmarks_last_updated
+
 
 class TestPricingAndBenchmarks(unittest.TestCase):
     def test_calculate_costs(self):
@@ -36,9 +42,9 @@ class TestPricingAndBenchmarks(unittest.TestCase):
         self.assertEqual(resolve_pricing_model("DeepSeek R1", "opencode"), "deepseek-r1")
         self.assertEqual(resolve_pricing_model("DeepSeek R4.1 Flash", "opencode"), "deepseek-r4-1-flash")
         self.assertEqual(resolve_pricing_model("Qwen 2.5 Coder 32B", "opencode"), "qwen-2-5-coder-32b")
-        # Explicit override
+
         self.assertEqual(resolve_pricing_model("Random Model", "antigravity", override_key="claude-5-5"), "claude-5-5")
-        # Agent fallbacks
+
         self.assertEqual(resolve_pricing_model("", "claude"), "claude-3-7-sonnet")
         self.assertEqual(resolve_pricing_model("", "opencode"), "deepseek-r4-1-flash")
 

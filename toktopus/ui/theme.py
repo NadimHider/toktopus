@@ -1,6 +1,5 @@
 from rich.theme import Theme
 
-# Truecolor palette for terminal rendering
 CYAN = "#00f3ff"
 PURPLE = "#b026ff"
 EMERALD = "#00ff88"

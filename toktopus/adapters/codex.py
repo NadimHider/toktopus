@@ -1,10 +1,10 @@
-import os
 import json
+import os
 import sqlite3
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 from toktopus.adapters.base import BaseAgentAdapter
 from toktopus.core.system import get_system_telemetry
@@ -39,7 +39,7 @@ class CodexAdapter(BaseAgentAdapter):
         if self._cached_session_id and (now - self._last_session_check) < 2.0:
             return self._cached_session_id
 
-        # 1. Check ~/.codex/session_index.jsonl
+
         index_file = CODEX_DIR / "session_index.jsonl"
         if index_file.exists():
             try:
@@ -62,16 +62,16 @@ class CodexAdapter(BaseAgentAdapter):
             except Exception:
                 pass
 
-        # 2. Check ~/.codex/sessions/**/rollout-*.jsonl
+
         sessions_root = CODEX_DIR / "sessions"
         if sessions_root.exists():
             try:
                 rollouts = list(sessions_root.rglob("rollout-*.jsonl"))
                 if rollouts:
                     rollouts.sort(key=lambda x: x.stat().st_mtime, reverse=True)
-                    # Extract ID from filename or content
+
                     name = rollouts[0].stem
-                    # Filename format: rollout-YYYY-MM-DDTHH-MM-SS-<uuid>
+
                     parts = name.split("-")
                     if len(parts) >= 5:
                         self._cached_session_id = "-".join(parts[-5:])
@@ -83,7 +83,7 @@ class CodexAdapter(BaseAgentAdapter):
             except Exception:
                 pass
 
-        # 3. Check ~/.copilot/data.db
+
         copilot_db = COPILOT_DIR / "data.db"
         if copilot_db.exists():
             conn = None
@@ -170,7 +170,7 @@ class CodexAdapter(BaseAgentAdapter):
         step_burns: List[int] = []
         recent_steps: List[Dict[str, Any]] = []
 
-        # Look for matching rollout file
+
         sessions_root = CODEX_DIR / "sessions"
         target_file = None
         if sessions_root.exists():
@@ -264,7 +264,7 @@ class CodexAdapter(BaseAgentAdapter):
             except Exception:
                 pass
 
-        # Fallback to Copilot data.db if no tokens found in rollouts
+
         if total_in == 0 and total_out == 0:
             copilot_db = COPILOT_DIR / "data.db"
             if copilot_db.exists():

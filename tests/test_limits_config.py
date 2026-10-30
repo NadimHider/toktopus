@@ -1,12 +1,18 @@
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from toktopus.core import config
+from toktopus.core.config import get_default_plan_for_agent, load_config, save_config
 from toktopus.core.limits import (
     TIER_LIMITS,
-    normalize_plan_key,
     auto_detect_plan,
+    estimate_account_limits,
     get_next_plan,
-    estimate_account_limits
+    normalize_plan_key,
 )
-from toktopus.core.config import load_config, save_config, get_default_plan_for_agent
+
 
 class TestLimitsAndConfig(unittest.TestCase):
     def test_google_ai_pro_plan_registered(self):
@@ -28,15 +34,15 @@ class TestLimitsAndConfig(unittest.TestCase):
         self.assertEqual(normalize_plan_key("cursor", "cursor"), "cursor-pro")
 
     def test_switching_agent_normalizes_to_valid_plan(self):
-        # When user was on Google AI Pro and switches to Claude, plan must switch to Claude plan
+
         claude_plan = normalize_plan_key("google-ai-pro", agent_key="claude")
         self.assertEqual(claude_plan, "claude-pro")
 
-        # When switching to Cursor
+
         cursor_plan = normalize_plan_key("google-ai-pro", agent_key="cursor")
         self.assertEqual(cursor_plan, "cursor-pro")
 
-        # When switching to OpenCode
+
         opencode_plan = normalize_plan_key("claude-pro", agent_key="opencode")
         self.assertEqual(opencode_plan, "opencode-zen")
 
@@ -79,10 +85,13 @@ class TestLimitsAndConfig(unittest.TestCase):
         self.assertEqual(auto_detect_plan("pi"), "pi-pro")
 
     def test_config_save_and_load(self):
-        self.assertTrue(save_config({"test_key": "test_val"}))
-        cfg = load_config()
-        self.assertIn("plan_tier", cfg)
-        self.assertEqual(cfg.get("test_key"), "test_val")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(config, "CONFIG_DIR", root), patch.object(config, "CONFIG_FILE", root / "config.json"):
+                self.assertTrue(save_config({"test_key": "test_val"}))
+                cfg = load_config()
+                self.assertIn("plan_tier", cfg)
+                self.assertEqual(cfg.get("test_key"), "test_val")
 
 if __name__ == "__main__":
     unittest.main()

@@ -59,4 +59,4 @@ To add support for a new coding agent:
 
 ## Questions
 
-Feel free to open an issue or reach out to me directly at nadim.hider@outlook.com.
+Please open a GitHub issue for questions.

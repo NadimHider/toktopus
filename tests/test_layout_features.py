@@ -1,5 +1,7 @@
 import unittest
+
 from toktopus.ui.layout import _format_duration, build_dashboard
+
 
 class TestLayoutFeatures(unittest.TestCase):
     def test_format_duration(self):
@@ -68,7 +70,7 @@ class TestLayoutFeatures(unittest.TestCase):
             "ai_processes": [],
             "gpu": None
         }
-        # 180k / 200k = 90% (triggers >= 85% alert)
+
         layout = build_dashboard(telemetry, sys_metrics, "claude", "claude-3-7-sonnet", plan_tier_key="claude-pro")
         self.assertIsNotNone(layout)
 
@@ -84,12 +86,12 @@ class TestLayoutFeatures(unittest.TestCase):
             "cache_read_tokens": 2500
         }
         sys_metrics = {"host_cpu_percent": 10.0, "host_ram_used_gb": 4.0, "host_ram_total_gb": 16.0, "host_ram_percent": 25.0, "ai_processes": [], "gpu": None}
-        
-        # Test wide layout (>= 102 cols)
+
+
         wide_layout = build_dashboard(telemetry, sys_metrics, "antigravity", "gemini-3.8-flash", console_width=120)
         self.assertIsNotNone(wide_layout)
 
-        # Test narrow layout (< 102 cols)
+
         narrow_layout = build_dashboard(telemetry, sys_metrics, "antigravity", "gemini-3.8-flash", console_width=85)
         self.assertIsNotNone(narrow_layout)
 
@@ -132,11 +134,11 @@ class TestLayoutFeatures(unittest.TestCase):
             "gpu": None
         }
 
-        # Collapsed mode
+
         dash_collapsed = build_dashboard(telemetry, sys_metrics, "pi", "gemini-3.8-flash", show_skills_expanded=False)
         self.assertIsNotNone(dash_collapsed)
 
-        # Expanded mode
+
         dash_expanded = build_dashboard(telemetry, sys_metrics, "pi", "gemini-3.8-flash", show_skills_expanded=True)
         self.assertIsNotNone(dash_expanded)
 

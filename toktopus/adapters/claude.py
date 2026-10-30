@@ -1,8 +1,8 @@
-import os
 import json
+import os
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from toktopus.adapters.base import BaseAgentAdapter
 
@@ -75,7 +75,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
             for proj_path, proj_data in projects.items():
                 if not isinstance(proj_data, dict):
                     continue
-                # If project matches current working directory
+
                 clean_p = proj_path.replace("\\", "/").rstrip("/")
                 if clean_p.lower() == cwd_str.lower():
                     return (proj_path, proj_data)
@@ -94,14 +94,14 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
         if self._cached_session_id and (now - self._last_session_check) < 2.0:
             return self._cached_session_id
 
-        # 1. Check .claude.json
+
         state = self._get_project_state_from_claude_json()
         if state and state[1].get("lastSessionId"):
             self._cached_session_id = state[1]["lastSessionId"]
             self._last_session_check = now
             return self._cached_session_id
 
-        # 2. Check recent files
+
         files = self._scan_recent_log_files()
         if files:
             self._cached_session_id = files[0].stem
@@ -127,7 +127,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
         step_burns: List[int] = []
         recent_steps: List[Dict[str, Any]] = []
 
-        # First populate base state from .claude.json if available
+
         claude_state = self._get_project_state_from_claude_json()
         if claude_state:
             p_path, p_data = claude_state
@@ -153,7 +153,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
                 if model_usage and isinstance(model_usage, dict):
                     model_name = list(model_usage.keys())[0]
 
-        # Next check for detailed turn logs in files
+
         files = self._scan_recent_log_files()
         target_file = None
         if sid:
@@ -273,7 +273,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
         total_tokens = total_in + total_out + total_cache + total_reasoning
         avg_tokens_per_step = int(total_tokens / len(recent_steps)) if recent_steps else 0
 
-        # Real throughput calculation
+
         tok_per_sec = 0
         if is_active:
             if recent_steps:

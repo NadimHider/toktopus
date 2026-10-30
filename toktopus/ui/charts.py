@@ -1,9 +1,9 @@
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Union
 
 BRAILLE_LEVELS = [" ", "⡀", "⣀", "⠤", "⠶", "⠒", "⠊", "⠉", "⠑"]
 SUB_BLOCKS = [" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"]
 
-def format_metric_number(val: float | int) -> str:
+def format_metric_number(val: Union[float, int]) -> str:
     n = float(val)
     if n >= 1_000_000_000:
         return f"{n / 1_000_000_000:.1f}B"

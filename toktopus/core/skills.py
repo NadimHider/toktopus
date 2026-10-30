@@ -3,7 +3,7 @@ import re
 import shutil
 import time
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 HOME_DIR = Path.home()
 
@@ -40,7 +40,7 @@ AGENT_SKILL_PATHS: Dict[str, List[Path]] = {
     ]
 }
 
-# Filter out None paths
+
 for _k in AGENT_SKILL_PATHS:
     AGENT_SKILL_PATHS[_k] = [p for p in AGENT_SKILL_PATHS[_k] if p is not None]
 
@@ -154,22 +154,22 @@ def list_installed_skills(agent_key: Optional[str] = None) -> List[Dict[str, Any
             if not base_p.exists():
                 continue
 
-            # Case 1: direct skills folder containing skill subdirectories
+
             try:
                 for entry in base_p.iterdir():
                     if not entry.is_dir() or entry.name.startswith("."):
                         continue
 
-                    # Direct SKILL.md in subdir
+
                     skill_md = entry / "SKILL.md"
                     if not skill_md.exists():
-                        # Try case-insensitive search
+
                         for f in entry.iterdir():
                             if f.name.lower() == "skill.md":
                                 skill_md = f
                                 break
 
-                    # Also check for plugin with skills/ subdirectory (e.g. plugins/<plugin>/skills/<skill>)
+
                     if not skill_md.exists():
                         nested_skills = entry / "skills"
                         if nested_skills.exists() and nested_skills.is_dir():
@@ -206,7 +206,7 @@ def _inspect_skill_dir(dir_path: Path, skill_md_path: Path, agent_name: str) -> 
             fm, body = _parse_frontmatter(header)
             desc = fm.get("description", "")
             if not desc:
-                # Use first non-empty line of body
+
                 for line in body.splitlines():
                     clean = line.strip().lstrip("#").strip()
                     if clean:
@@ -239,7 +239,7 @@ def get_skill(skill_name: str, agent_key: Optional[str] = None) -> Optional[Dict
             matched = s
 
     if not matched:
-        # Check if direct file or directory path was passed
+
         p = Path(skill_name)
         if p.exists():
             md_path = p if p.name.lower() == "skill.md" else (p / "SKILL.md")
@@ -316,7 +316,7 @@ def modify_skill(
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(final_text)
 
-        # Invalidate cache
+
         _SKILLS_CACHE.clear()
         return True
     except Exception:

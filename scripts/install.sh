@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# toktopus Linux and macOS One-Liner Installer
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/NadimHider/toktopus/main/scripts/install.sh | bash
 
 set -e
 

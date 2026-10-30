@@ -1,36 +1,34 @@
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, Optional
+
+from rich import box
 from rich.layout import Layout
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from rich import box
 
 from toktopus import __version__
-from toktopus.ui.charts import (
-    braille_sparkline,
-    context_gauge,
-    quota_gauge,
-    stacked_token_ratio_bar,
-    mini_cpu_gauge,
-    relative_benchmark_bar,
-    cache_efficiency_gauge,
-    large_cache_gauge,
-    cache_split_bar,
-    cache_trend_sparkline,
-    cost_burn_bar,
-    format_metric_number,
-    token_composition_tank,
-    system_resource_bar
-)
-from toktopus.core.pricing import calculate_costs, resolve_pricing_model
 from toktopus.core.benchmarks import get_benchmarks, get_benchmarks_last_updated
 from toktopus.core.limits import estimate_account_limits
+from toktopus.core.pet import get_cyber_pet
+from toktopus.core.pricing import calculate_costs, resolve_pricing_model
 from toktopus.core.skills import (
     count_skills_and_plugins,
     get_all_agents_skill_summary,
-    list_installed_skills
+    list_installed_skills,
 )
-from toktopus.core.pet import get_cyber_pet
+from toktopus.ui.charts import (
+    braille_sparkline,
+    cache_split_bar,
+    cache_trend_sparkline,
+    context_gauge,
+    format_metric_number,
+    large_cache_gauge,
+    mini_cpu_gauge,
+    quota_gauge,
+    relative_benchmark_bar,
+    token_composition_tank,
+)
+
 
 def _format_duration(seconds: float) -> str:
     if seconds <= 0:
@@ -112,7 +110,7 @@ def build_dashboard(
 
     layout["header"].update(Panel(header_text, style="#00f3ff", border_style="#00f3ff", box=box.ROUNDED))
 
-    # Extract tokens
+
     current_ctx = telemetry.get("current_context_tokens", 0)
     max_ctx = telemetry.get("max_context_tokens", 2_000_000)
     in_tok = telemetry.get("input_tokens", 0)
@@ -124,7 +122,7 @@ def build_dashboard(
     cache_eff = telemetry.get("cache_efficiency", 0.0)
     detected_model = telemetry.get("model_name", "Gemini 3.8 Flash")
 
-    # Resolve pricing model
+
     effective_pricing_key = resolve_pricing_model(detected_model, active_agent_key, pricing_model_key)
 
     recent_steps = telemetry.get("recent_steps", [])
@@ -153,20 +151,12 @@ def build_dashboard(
     if limits["max_context"] > 0:
         max_ctx = limits["max_context"]
 
-    # Autonomous Pet Simulation Tick
     pet = get_cyber_pet()
     tok_per_sec = telemetry.get("tokens_per_sec", 0)
-    pet.tick(
-        is_active=is_active,
-        tokens_per_sec=tok_per_sec,
-        cache_eff=cache_eff,
-        current_ctx=current_ctx,
-        total_tokens=total_sess_tok
-    )
 
-    # =========================================================================
-    # TOP ROW: Context Window & Quotas | Cache Hit Efficiency | Pet Companion
-    # =========================================================================
+
+
+
     show_pet_in_top = (w >= 102)
 
     if show_pet_in_top:
@@ -181,7 +171,7 @@ def build_dashboard(
             Layout(name="cache_box", ratio=1)
         )
 
-    # 1. Context Window & Limits Panel
+
     context_table = Table.grid(padding=(0, 1), expand=True)
     context_table.add_column("label", justify="left")
     context_table.add_column("val", justify="left")
@@ -217,7 +207,7 @@ def build_dashboard(
         Panel(context_table, title="[bold #00f3ff][CONTEXT & LIMITS][/bold #00f3ff]", border_style="#00f3ff", box=box.ROUNDED, padding=(0, 1))
     )
 
-    # 2. DEDICATED Cache Hit Efficiency Panel
+
     cache_table = Table.grid(padding=(0, 1), expand=True)
     cache_table.add_column("label", justify="left")
     cache_table.add_column("val", justify="left")
@@ -254,13 +244,13 @@ def build_dashboard(
         Panel(cache_table, title="[bold #00ff88][CACHE & LEVERAGE][/bold #00ff88]", border_style="#00ff88", box=box.ROUNDED, padding=(0, 1))
     )
 
-    # 3. Tokto Cyber-Pet Widget (if top row wide enough)
+
     if show_pet_in_top:
         layout["top_row"]["pet_box"].update(pet.render_widget())
 
-    # =========================================================================
-    # MIDDLE ROW: Real-Time Billing & Pricing | Token Velocity & Burns
-    # =========================================================================
+
+
+
     layout["middle_row"].split_row(
         Layout(name="billing_box", ratio=1),
         Layout(name="velocity_box", ratio=1)
@@ -301,7 +291,7 @@ def build_dashboard(
         Panel(billing_table, title="[bold #ffe600][SESSION BILLING & PRICING][/bold #ffe600]", border_style="#ffe600", box=box.ROUNDED, padding=(0, 1))
     )
 
-    # 4. Token Velocity & Burns Panel
+
     avg_per_step = telemetry.get("tokens_per_step", 0)
     sparkline_str = braille_sparkline(step_burns, max_width=20)
 
@@ -342,9 +332,9 @@ def build_dashboard(
         Panel(velocity_table, title="[bold #b026ff][TOKEN VELOCITY & BURNS][/bold #b026ff]", border_style="#b026ff", box=box.ROUNDED, padding=(0, 1))
     )
 
-    # =========================================================================
-    # SKILLS ROW: Collapsible / Expandable Skill Vault Underneath Stats
-    # =========================================================================
+
+
+
     if show_skills_expanded:
         skills_list = list_installed_skills(active_agent_key)
         if not skills_list:
@@ -391,9 +381,9 @@ def build_dashboard(
             Panel(sk_text, title="[bold #00ff88][SKILLS VAULT : CROSS-AGENT OVERVIEW (COLLAPSED)][/bold #00ff88]", border_style="#00ff88", box=box.ROUNDED, padding=(0, 1))
         )
 
-    # =========================================================================
-    # LOWER ROW: Full Benchmarks OR Real-Time Step Transcript
-    # =========================================================================
+
+
+
     if show_full_benchmarks:
         bench_table = Table(box=None, expand=True, pad_edge=False)
         bench_table.add_column("Model", style="bold white", no_wrap=True)
@@ -469,9 +459,9 @@ def build_dashboard(
             Panel(step_table, title="[bold white][REAL-TIME AGENT STEP TRANSCRIPT][/bold white]", border_style="dim", box=box.ROUNDED, padding=(0, 1))
         )
 
-    # =========================================================================
-    # SYSTEM ROW: Extended System Hardware & Process Telemetry
-    # =========================================================================
+
+
+
     host_cpu = sys_metrics.get("host_cpu_percent") or 0.0
     cpu_freq = sys_metrics.get("cpu_freq_mhz") or 0.0
     cores_p = sys_metrics.get("cpu_cores_physical") or 1
@@ -493,9 +483,9 @@ def build_dashboard(
 
     sys_text = Text()
     freq_str = f" @ {cpu_freq:.0f}MHz" if cpu_freq > 0 else ""
-    sys_text.append(f"Host CPU: [{mini_cpu_gauge(host_cpu, 8)}] {host_cpu:.1f}%{freq_str} ({cores_p}P/{cores_l}L)  |  ", style="white")
-    sys_text.append(f"RAM: [{mini_cpu_gauge(host_ram_pct, 8)}] {host_ram_used:.1f}/{host_ram_total:.1f}GB ({host_ram_pct:.1f}%)  |  ", style="white")
-    sys_text.append(f"Swap: [{mini_cpu_gauge(swap_pct, 6)}] {swap_used:.1f}/{swap_total:.1f}GB", style="white")
+    sys_text.append_text(Text.from_markup(f"Host CPU: {mini_cpu_gauge(host_cpu, 8)} {host_cpu:.1f}%{freq_str} ({cores_p}P/{cores_l}L)  |  ", style="white"))
+    sys_text.append_text(Text.from_markup(f"RAM: {mini_cpu_gauge(host_ram_pct, 8)} {host_ram_used:.1f}/{host_ram_total:.1f}GB ({host_ram_pct:.1f}%)  |  ", style="white"))
+    sys_text.append_text(Text.from_markup(f"Swap: {mini_cpu_gauge(swap_pct, 6)} {swap_used:.1f}/{swap_total:.1f}GB", style="white"))
 
     gpu_str = ""
     if gpu_data:
@@ -503,9 +493,9 @@ def build_dashboard(
         vram_used = (gpu_data.get("vram_used_mb") or 0.0) / 1024.0
         vram_total = (gpu_data.get("vram_total_mb") or 0.0) / 1024.0
         gpu_name = gpu_data.get("gpu_name") or "GPU"
-        gpu_str = f"  |  {gpu_name}: [{mini_cpu_gauge(gpu_util, 6)}] {gpu_util:.0f}% ({vram_used:.1f}/{vram_total:.1f}GB)"
+        gpu_str = f"  |  {gpu_name}: {mini_cpu_gauge(gpu_util, 6)} {gpu_util:.0f}% ({vram_used:.1f}/{vram_total:.1f}GB)"
 
-    sys_text.append(f"\nDisk: [{mini_cpu_gauge(disk_pct, 8)}] {disk_used:.1f}/{disk_total:.1f}GB ({disk_pct:.1f}%) [Free {disk_free:.1f}GB]  |  Net: Up {net_sent:.1f}MB / Down {net_recv:.1f}MB{gpu_str}", style="white")
+    sys_text.append_text(Text.from_markup(f"\nDisk: {mini_cpu_gauge(disk_pct, 8)} {disk_used:.1f}/{disk_total:.1f}GB ({disk_pct:.1f}%) Free {disk_free:.1f}GB  |  Net: Up {net_sent:.1f}MB / Down {net_recv:.1f}MB{gpu_str}", style="white"))
 
     sys_text.append("\nActive AI Processes: ", style="bold #00f3ff")
     if ai_procs:
@@ -520,17 +510,11 @@ def build_dashboard(
         Panel(sys_text, title="[bold #00f3ff][EXTENDED SYSTEM HARDWARE & PROCESS TELEMETRY][/bold #00f3ff]", border_style="#00f3ff", box=box.ROUNDED, padding=(0, 1))
     )
 
-    # =========================================================================
-    # FOOTER: Navigation and Hotkeys
-    # =========================================================================
+
+
+
     footer_text = Text()
-    footer_text.append(" [1] Antigravity ", style="bold #00ff88" if active_agent_key == "antigravity" else "dim")
-    footer_text.append(" [2] Claude Code ", style="bold #00ff88" if active_agent_key == "claude" else "dim")
-    footer_text.append(" [3] OpenCode ", style="bold #00ff88" if active_agent_key == "opencode" else "dim")
-    footer_text.append(" [4] Cursor ", style="bold #00ff88" if active_agent_key == "cursor" else "dim")
-    footer_text.append(" [5] Codex ", style="bold #00ff88" if active_agent_key == "codex" else "dim")
-    footer_text.append(" [6] Pi Agent ", style="bold #00ff88" if active_agent_key == "pi" else "dim")
-    footer_text.append(f" | [P] Plan  [M] Model  [B] Benchmarks  [S] Skills  [E] Edit Skill  [G] Space Impact  [O] Pet Lounge  [F] Feed  [T] Pet  [Q] Quit", style="bold white")
+    footer_text.append(" 1-6 Agents  P Plan  M Model  B Bench  S Skills  E Edit  G Game  O Pet  F Feed  T Pet  R Refresh  Q Quit", style="white")
 
     layout["footer"].update(Panel(footer_text, border_style="dim", box=box.ROUNDED))
 
