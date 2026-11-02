@@ -530,7 +530,7 @@ def main():
     timeline_offset = 0
     try:
         with Live(console=console, screen=True, auto_refresh=False) as live:
-            last_refresh = 0.0
+            last_refresh = -math.inf
 
             while True:
                 now = time.monotonic()
@@ -550,10 +550,10 @@ def main():
                             timeline_offset = max(0, min(max(0, ((count - 1) // 6) * 6), timeline_offset + (6 if key == 'n' else -6)))
                     except (OSError, sqlite3.Error, ValueError) as exc:
                         history_error = f'Local history unavailable ({type(exc).__name__})'
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif current_view == 'history' and key in ('[', ']'):
                     selected_history = max(0, min(5, selected_history + (1 if key == ']' else -1)))
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif current_view == 'history' and key in ('\r', '\n') and history_store and not history_error:
                     try:
                         rows = history_store.sessions(limit=6, offset=history_offset)
@@ -565,49 +565,49 @@ def main():
                         timeline_selection = (row['agent'], row['session_id'])
                         timeline_offset = 0
                         current_view = 'timeline'
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key in KEY_MAP:
                     active_agent_key = KEY_MAP[key]
                     adapter = get_adapter(active_agent_key)
                     plan_tier = auto_detect_plan(active_agent_key)
                     save_config({"active_agent": active_agent_key, "plan_tier": plan_tier})
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key == "p":
                     plan_tier = get_next_plan(plan_tier, active_agent_key)
                     save_config({"plan_tier": plan_tier})
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key == "d":
                     current_view = "overview" if current_view == "diagnostics" else "diagnostics"
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key == "h":
                     current_view = "overview" if current_view == "health" else "health"
                     if current_view == "health":
                         health_snapshot = load_model_health()
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key == "j":
                     current_view = "overview" if current_view == "history" else "history"
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key == "f":
                     get_cyber_pet().feed()
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key == "t":
                     get_cyber_pet().pet()
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key == "o":
                     restore_keyboard()
                     try:
                         run_pet_lounge()
                     finally:
                         init_keyboard()
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key == "m":
                     current_pricing_idx = (current_pricing_idx + 1) % len(PRICING_KEYS)
                     save_config({"pricing_model": PRICING_KEYS[current_pricing_idx]})
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key == "b":
                     show_full_benchmarks = not show_full_benchmarks
                     save_config({"show_benchmarks": show_full_benchmarks})
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key == "g":
 
                     restore_keyboard()
@@ -615,11 +615,11 @@ def main():
                         run_space_impact(standalone=False)
                     finally:
                         init_keyboard()
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key == "s":
 
                     show_skills_expanded = not show_skills_expanded
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key == "e":
 
                     restore_keyboard()
@@ -627,10 +627,10 @@ def main():
                         interactive_edit_skill(active_agent_key)
                     finally:
                         init_keyboard()
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
                 elif key == "r":
                     collector.checked.clear()
-                    last_refresh = 0.0
+                    last_refresh = -math.inf
 
                 if now - last_refresh >= args.rate:
                     telemetry = collector.poll(active_agent_key)

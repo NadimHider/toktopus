@@ -166,6 +166,7 @@ class ObservabilityTests(unittest.TestCase):
             stack.enter_context(patch.object(cli, 'HistoryStore', return_value=self.store))
             stack.enter_context(patch.object(cli, 'get_system_telemetry', return_value={}))
             stack.enter_context(patch.object(cli, 'update_pet'))
+            stack.enter_context(patch.object(cli.time, 'monotonic', return_value=0.1))
             stack.enter_context(patch.object(cli, 'load_model_health', return_value={'rows': [], 'stale': True}))
             stack.enter_context(patch.object(cli, 'init_keyboard'))
             restore = stack.enter_context(patch.object(cli, 'restore_keyboard'))
