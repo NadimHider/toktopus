@@ -1,10 +1,12 @@
 import json
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from toktopus.adapters.base import BaseAgentAdapter
+from toktopus.core.native_events import read_native_events
 
 CLAUDE_DIR = Path(os.environ["CLAUDE_HOME"]) if os.environ.get("CLAUDE_HOME") else Path.home() / ".claude"
 CLAUDE_JSON = Path(os.environ["CLAUDE_HOME"]) / ".claude.json" if os.environ.get("CLAUDE_HOME") else Path.home() / ".claude.json"
@@ -215,7 +217,7 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
 
                                 ts_val = d.get("timestamp")
                                 if ts_val:
-                                    ts_f = float(ts_val)
+                                    ts_f = datetime.fromisoformat(ts_val.replace('Z', '+00:00')).timestamp() if isinstance(ts_val, str) and 'T' in ts_val else float(ts_val)
                                     if start_ts == 0.0:
                                         start_ts = ts_f
                                     if last_step_ts > 0 and ts_f > last_step_ts:
@@ -275,12 +277,13 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
 
 
         tok_per_sec = 0
-        if is_active:
-            if recent_steps:
-                recent_out = recent_steps[-1].get("total_tokens", 0)
-                tok_per_sec = max(15, min(300, recent_out // 2)) if recent_out > 0 else 60
-            else:
-                tok_per_sec = 60
+        if target_file and target_file.suffix == '.jsonl':
+            try:
+                tool_events, _ = read_native_events(target_file, 'claude')
+                if tool_events:
+                    recent_steps = tool_events
+            except (OSError, ValueError):
+                pass
 
         display_sid = sid if sid else "no-active-session"
         title = f"Claude: {display_sid[:12]}" if sid else "Claude Code: Idle"
@@ -301,10 +304,11 @@ class ClaudeCodeAdapter(BaseAgentAdapter):
             "cache_efficiency": cache_eff,
             "tokens_per_step": avg_tokens_per_step,
             "tokens_per_sec": tok_per_sec,
+            "tokens_per_sec_available": False,
             "session_elapsed_sec": elapsed_sec,
             "session_cost": session_cost,
             "recent_steps_tokens": step_burns[-25:] if step_burns else [0],
-            "recent_steps": recent_steps[-6:],
+            "recent_steps": recent_steps[-1000:],
             "active_subagents": [],
             "is_active": is_active,
             "last_modified": last_modified

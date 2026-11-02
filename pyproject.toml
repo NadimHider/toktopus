@@ -48,6 +48,7 @@ Issues = "https://github.com/NadimHider/toktopus/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["toktopus*"]
 
 [tool.setuptools.package-data]
 toktopus = ["web/*.html"]

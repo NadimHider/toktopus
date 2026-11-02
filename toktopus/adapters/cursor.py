@@ -184,8 +184,6 @@ class CursorAdapter(BaseAgentAdapter):
         total_tokens = total_in + total_out + total_cache
 
         tok_per_sec = 0
-        if cursor_active:
-            tok_per_sec = 55 if total_tokens > 0 else 0
 
         return {
             "agent_name": self.get_agent_name(),
@@ -201,6 +199,7 @@ class CursorAdapter(BaseAgentAdapter):
             "cache_efficiency": cache_eff,
             "tokens_per_step": int(total_tokens / len(recent_steps)) if recent_steps else 0,
             "tokens_per_sec": tok_per_sec,
+            "tokens_per_sec_available": False,
             "session_elapsed_sec": 0.0,
             "recent_steps_tokens": step_burns[-25:] if step_burns else [0],
             "recent_steps": recent_steps,

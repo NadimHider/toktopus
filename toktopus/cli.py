@@ -2,6 +2,7 @@ import argparse
 import json
 import math
 import os
+import sqlite3
 import sys
 import time
 import webbrowser
@@ -21,7 +22,10 @@ if hasattr(sys.stdout, "reconfigure"):
 from toktopus import __version__
 from toktopus.adapters import KEY_MAP, auto_detect_active_agent, get_adapter
 from toktopus.core.benchmarks import get_benchmarks, get_benchmarks_last_updated
+from toktopus.core.collector import LocalCollector
 from toktopus.core.config import load_config, save_config
+from toktopus.core.diagnostics import render_diagnostics
+from toktopus.core.history import HistoryStore
 from toktopus.core.keyboard import get_pressed_key, init_keyboard, restore_keyboard
 from toktopus.core.limits import (
     auto_detect_plan,
@@ -29,6 +33,7 @@ from toktopus.core.limits import (
     get_next_plan,
     normalize_plan_key,
 )
+from toktopus.core.model_health import load_model_health
 from toktopus.core.pet import get_cyber_pet, run_pet_lounge
 from toktopus.core.pricing import PRICING_TABLE, calculate_costs, resolve_pricing_model
 from toktopus.core.skills import (
@@ -38,8 +43,11 @@ from toktopus.core.skills import (
     modify_skill,
 )
 from toktopus.core.system import get_system_telemetry
+from toktopus.core.trace_import import import_otlp
 from toktopus.game import run_space_impact
+from toktopus.ui.history import render_history, render_timeline
 from toktopus.ui.layout import build_dashboard
+from toktopus.ui.model_health import render_model_health
 from toktopus.ui.theme import THEME_CONFIG
 
 console = Console(theme=THEME_CONFIG)
@@ -168,8 +176,8 @@ def export_telemetry_snapshot(export_path: str, telemetry: dict, sys_metrics: di
 
     effective_pricing = resolve_pricing_model(telemetry.get("model_name"), agent_key, pricing_key)
     costs = calculate_costs(
-        input_tokens=in_tok,
-        output_tokens=out_tok,
+        input_tokens=max(0, in_tok - cache_tok) if agent_key == "codex" else in_tok,
+        output_tokens=max(0, out_tok - reason_tok) if agent_key == "codex" else out_tok,
         cache_read_tokens=cache_tok,
         model_key=effective_pricing,
         reasoning_tokens=reason_tok,
@@ -179,8 +187,11 @@ def export_telemetry_snapshot(export_path: str, telemetry: dict, sys_metrics: di
     )
 
     agent_cost = telemetry.get("session_cost", 0.0)
+    costs['source'] = 'estimated_api_equivalent'
+    costs['actual_billed_usd'] = None
     if agent_cost > 0:
         costs["cost_spent_usd"] = agent_cost
+        costs['source'] = 'agent_reported_cost_estimate'
 
     limits = estimate_account_limits(
         agent_key,
@@ -200,8 +211,8 @@ def export_telemetry_snapshot(export_path: str, telemetry: dict, sys_metrics: di
             "session_elapsed_sec": elapsed_sec
         },
         "tokens": {
-            "current_context": current_ctx,
-            "max_context": limits.get("max_context", 2_000_000),
+            "current_context": current_ctx if telemetry.get('current_context_available') is not False else None,
+            "max_context": telemetry.get("max_context_tokens"),
             "input": in_tok,
             "output": out_tok,
             "cache_read": cache_tok,
@@ -210,9 +221,10 @@ def export_telemetry_snapshot(export_path: str, telemetry: dict, sys_metrics: di
             "total_session": telemetry.get("total_tokens", in_tok + out_tok + cache_tok + reason_tok),
             "cache_efficiency_pct": telemetry.get("cache_efficiency", 0.0),
             "tokens_per_step": telemetry.get("tokens_per_step", 0),
-            "tokens_per_sec": telemetry.get("tokens_per_sec", 0)
+            "tokens_per_sec": telemetry.get("tokens_per_sec", 0) if telemetry.get('tokens_per_sec_available') is not False else None
         },
         "account_limits": limits,
+        "measurement": {"source": "local", "scope": "session", "billing": costs['source'], "last_modified": telemetry.get("last_modified"), "diagnostic": telemetry.get("diagnostic_error"), "data_status": telemetry.get('data_status'), "token_semantics": telemetry.get('token_semantics')},
         "billing": costs,
         "system": {
             "host_cpu_percent": sys_metrics.get("host_cpu_percent"),
@@ -250,7 +262,6 @@ def main():
     )
     parser.add_argument(
         "--agent", "-a",
-        choices=["antigravity", "claude", "opencode", "cursor", "codex", "pi", "auto"],
         default=saved_cfg.get("active_agent", "auto"),
         help="Target AI agent to monitor (default: saved config or auto)"
     )
@@ -344,13 +355,42 @@ def main():
         version=f"toktopus v{__version__}"
     )
 
+    parser.add_argument("--model-health", action="store_true", help="Show cached LiveNerf results (offline)")
+    parser.add_argument("--refresh-model-health", action="store_true", help="Download public LiveNerf results and show Model Health")
+    parser.add_argument("--diagnostics", action="store_true", help="Show local telemetry source diagnostics")
+    parser.add_argument("--history", action="store_true", help="Show locally recorded session history")
+    parser.add_argument("--search", default="", help="Filter history by agent, session ID or model")
+    parser.add_argument("--timeline", metavar="SESSION_ID", help="Show recorded events for a session; use --agent")
+    parser.add_argument("--no-history", action="store_true", help="Disable local history recording")
+    parser.add_argument("--import-otlp", metavar="FILE", help="Import local OTLP JSON span metadata without uploading")
     args = parser.parse_args()
+    if args.agent not in {"antigravity", "claude", "opencode", "cursor", "codex", "pi", "auto"} and not (args.timeline and args.agent.startswith('otel:')):
+        parser.error("Unknown agent; use antigravity, claude, opencode, cursor, codex, pi or auto (otel:service is accepted for --timeline)")
 
     if not math.isfinite(args.rate) or args.rate <= 0:
         parser.error("--rate must be a finite positive number")
 
     if args.no_color or os.environ.get("NO_COLOR"):
         console.no_color = True
+
+    if args.model_health or args.refresh_model_health:
+        console.print(render_model_health(load_model_health(refresh=args.refresh_model_health)))
+        return
+
+    if args.history or args.timeline or args.import_otlp:
+        try:
+            store = HistoryStore()
+            if args.import_otlp:
+                console.print(f"Imported {import_otlp(args.import_otlp, store)} spans locally.")
+        except (OSError, sqlite3.Error, ValueError, TypeError, KeyError) as exc:
+            parser.error(f"Local history/import failed ({type(exc).__name__}): check the file and storage permissions")
+        if args.timeline:
+            if args.agent == "auto":
+                parser.error("--timeline requires an explicit --agent")
+            console.print(render_timeline(store, args.agent, args.timeline))
+        else:
+            console.print(render_history(store, args.search))
+        return
 
     if args.web_game:
         game_path = Path(__file__).resolve().parent / "web" / "space-impact.html"
@@ -435,8 +475,23 @@ def main():
     show_skills_expanded = False
 
     adapter = get_adapter(active_agent_key)
-    telemetry = adapter.get_session_telemetry()
+    collector = LocalCollector()
+    collector.adapters[active_agent_key] = adapter
+    telemetry = collector.poll(active_agent_key)
     sys_metrics = get_system_telemetry()
+    history_store = None
+    history_error = None
+    if not args.no_history:
+        try:
+            history_store = HistoryStore()
+            history_store.record(active_agent_key, telemetry)
+        except (OSError, sqlite3.Error) as exc:
+            history_error = f"Local history unavailable ({type(exc).__name__})"
+            console.print(history_error, markup=False)
+
+    if args.diagnostics:
+        console.print(render_diagnostics(telemetry, active_agent_key))
+        return
 
     if args.export:
         export_telemetry_snapshot(args.export, telemetry, sys_metrics, active_agent_key, plan_tier, PRICING_KEYS[current_pricing_idx])
@@ -462,6 +517,11 @@ def main():
         parser.error("the live dashboard requires an interactive terminal; use --once or --export")
 
     init_keyboard()
+    current_view = "overview"
+    health_snapshot = None
+    last_discovery = -5.0
+    selected_history = 0
+    timeline_selection = None
     try:
         with Live(console=console, screen=True, auto_refresh=False) as live:
             last_refresh = 0.0
@@ -472,6 +532,16 @@ def main():
                 key = get_pressed_key()
                 if key == "q":
                     break
+                elif current_view == 'history' and key in ('[', ']'):
+                    selected_history = max(0, min(5, selected_history + (1 if key == ']' else -1)))
+                    last_refresh = 0.0
+                elif current_view == 'history' and key in ('\r', '\n') and history_store and not history_error:
+                    rows = history_store.sessions(limit=6)
+                    if rows:
+                        row = rows[min(selected_history, len(rows) - 1)]
+                        timeline_selection = (row['agent'], row['session_id'])
+                        current_view = 'timeline'
+                    last_refresh = 0.0
                 elif key in KEY_MAP:
                     active_agent_key = KEY_MAP[key]
                     adapter = get_adapter(active_agent_key)
@@ -481,6 +551,17 @@ def main():
                 elif key == "p":
                     plan_tier = get_next_plan(plan_tier, active_agent_key)
                     save_config({"plan_tier": plan_tier})
+                    last_refresh = 0.0
+                elif key == "d":
+                    current_view = "overview" if current_view == "diagnostics" else "diagnostics"
+                    last_refresh = 0.0
+                elif key == "h":
+                    current_view = "overview" if current_view == "health" else "health"
+                    if current_view == "health":
+                        health_snapshot = load_model_health()
+                    last_refresh = 0.0
+                elif key == "j":
+                    current_view = "overview" if current_view == "history" else "history"
                     last_refresh = 0.0
                 elif key == "f":
                     get_cyber_pet().feed()
@@ -524,10 +605,19 @@ def main():
                         init_keyboard()
                     last_refresh = 0.0
                 elif key == "r":
+                    collector.checked.clear()
                     last_refresh = 0.0
 
                 if now - last_refresh >= args.rate:
-                    telemetry = adapter.get_session_telemetry()
+                    telemetry = collector.poll(active_agent_key)
+                    if history_store is not None and not history_error:
+                        try:
+                            if now - last_discovery >= 5:
+                                for agent_key, snapshot in collector.poll_detected().items():
+                                    history_store.record(agent_key, snapshot)
+                                last_discovery = now
+                        except (OSError, sqlite3.Error) as exc:
+                            history_error = f"Local history unavailable ({type(exc).__name__})"
                     sys_metrics = get_system_telemetry()
                     update_pet(telemetry)
 
@@ -542,6 +632,14 @@ def main():
                         console_height=console.size.height,
                         console_width=console.size.width
                     )
+                    if current_view == "diagnostics":
+                        dashboard = render_diagnostics(telemetry, active_agent_key)
+                    elif current_view == "health":
+                        dashboard = render_model_health(health_snapshot, compact=True)
+                    elif current_view == "history":
+                        dashboard = render_history(history_store, limit=6, selected=selected_history) if history_store and not history_error else (history_error or "History disabled (--no-history). J returns to Overview.")
+                    elif current_view == 'timeline' and timeline_selection:
+                        dashboard = render_timeline(history_store, *timeline_selection, limit=6)
                     live.update(dashboard, refresh=True)
                     last_refresh = now
 

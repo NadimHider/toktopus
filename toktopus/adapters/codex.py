@@ -1,38 +1,25 @@
 import json
 import os
-import sqlite3
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from toktopus.adapters.base import BaseAgentAdapter
+from toktopus.core.native_events import read_native_events
 from toktopus.core.system import get_system_telemetry
 
 CODEX_DIR = Path(os.environ["CODEX_HOME"]) if os.environ.get("CODEX_HOME") else Path.home() / ".codex"
-COPILOT_DIR = Path.home() / ".copilot"
-
-COPILOT_CONFIG_DIRS = [
-    CODEX_DIR,
-    COPILOT_DIR,
-    Path.home() / ".config" / "github-copilot",
-    Path(os.environ.get("LOCALAPPDATA", "")) / "github-copilot" if os.environ.get("LOCALAPPDATA") else None
-]
-COPILOT_CONFIG_DIRS = [p for p in COPILOT_CONFIG_DIRS if p is not None]
-
 class CodexAdapter(BaseAgentAdapter):
     def __init__(self):
         self._cached_session_id: Optional[str] = None
         self._last_session_check: float = 0.0
 
     def get_agent_name(self) -> str:
-        return "Codex / Copilot"
+        return "Codex"
 
     def is_detected(self) -> bool:
-        for p in COPILOT_CONFIG_DIRS:
-            if p and p.exists():
-                return True
-        return False
+        return CODEX_DIR.exists()
 
     def get_active_session_id(self) -> Optional[str]:
         now = time.time()
@@ -84,27 +71,6 @@ class CodexAdapter(BaseAgentAdapter):
                 pass
 
 
-        copilot_db = COPILOT_DIR / "data.db"
-        if copilot_db.exists():
-            conn = None
-            try:
-                conn = sqlite3.connect(f"file:{copilot_db.as_posix()}?mode=ro", uri=True, timeout=1.0)
-                cur = conn.cursor()
-                cur.execute("SELECT id FROM sessions ORDER BY updated_at DESC LIMIT 1;")
-                row = cur.fetchone()
-                if row and row[0]:
-                    self._cached_session_id = str(row[0])
-                    self._last_session_check = now
-                    return self._cached_session_id
-            except Exception:
-                pass
-            finally:
-                if conn:
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
-
         return None
 
     def _get_thread_title(self, session_id: str) -> Optional[str]:
@@ -129,15 +95,15 @@ class CodexAdapter(BaseAgentAdapter):
     def get_session_telemetry(self, session_id: Optional[str] = None) -> Dict[str, Any]:
         sys_info = get_system_telemetry()
         ai_procs = sys_info.get("ai_processes", [])
-        codex_proc_active = any("codex" in p.get("label", "").lower() or "copilot" in p.get("label", "").lower() for p in ai_procs)
+        codex_proc_active = any("codex" in p.get("label", "").lower() for p in ai_procs)
 
         sid = session_id or self.get_active_session_id()
         if not sid:
             return {
                 "agent_name": self.get_agent_name(),
                 "session_id": "no-session",
-                "title": "Codex / Copilot: Idle",
-                "model_name": "OpenAI o3-mini (Codex)",
+                "title": "Codex: Idle",
+                "model_name": "Unknown",
                 "max_context_tokens": 200_000,
                 "current_context_tokens": 0,
                 "input_tokens": 0,
@@ -162,7 +128,7 @@ class CodexAdapter(BaseAgentAdapter):
         total_reasoning = 0
         active_context = 0
         max_context = 200_000
-        model_name = "OpenAI o3-mini (Codex)"
+        model_name = "Unknown"
         last_modified = 0.0
         start_time = 0.0
         elapsed_sec = 0.0
@@ -233,10 +199,10 @@ class CodexAdapter(BaseAgentAdapter):
                                     out_t = last_usage.get("output_tokens", 0)
                                     c_t = last_usage.get("cached_input_tokens", 0)
                                     r_t = last_usage.get("reasoning_output_tokens", 0)
-                                    turn_tok = in_t + out_t + c_t + r_t
+                                    turn_tok = in_t + out_t
                                     if turn_tok > 0:
                                         step_burns.append(turn_tok)
-                                    active_context = in_t + c_t
+                                    active_context = in_t
 
                             elif t == "response_item":
                                 item_type = payload.get("type")
@@ -265,61 +231,23 @@ class CodexAdapter(BaseAgentAdapter):
                 pass
 
 
-        if total_in == 0 and total_out == 0:
-            copilot_db = COPILOT_DIR / "data.db"
-            if copilot_db.exists():
-                conn = None
-                try:
-                    conn = sqlite3.connect(f"file:{copilot_db.as_posix()}?mode=ro", uri=True, timeout=1.0)
-                    cur = conn.cursor()
-                    cur.execute("""
-                        SELECT id, title, model, total_input_tokens, total_output_tokens,
-                               total_cached_tokens, total_reasoning_tokens, context_current_tokens,
-                               context_input_token_limit, updated_at
-                        FROM sessions WHERE id = ? LIMIT 1;
-                    """, (sid,))
-                    row = cur.fetchone()
-                    if row:
-                        sid, db_title, db_model, in_t, out_t, c_t, r_t, cur_t, lim_t, up_at = row
-                        total_in = in_t or 0
-                        total_out = out_t or 0
-                        total_cache = c_t or 0
-                        total_reasoning = r_t or 0
-                        active_context = cur_t or (total_in + total_cache)
-                        if lim_t:
-                            max_context = int(lim_t)
-                        if db_model:
-                            model_name = str(db_model)
-                        if up_at:
-                            last_modified = float(up_at) / 1000.0 if float(up_at) > 1e11 else float(up_at)
-                            is_active = is_active or ((time.time() - last_modified) < 180)
-                except Exception:
-                    pass
-                finally:
-                    if conn:
-                        try:
-                            conn.close()
-                        except Exception:
-                            pass
-
-        denom = total_in + total_cache
+        denom = total_in
         cache_eff = round((total_cache / denom) * 100, 1) if denom > 0 else 0.0
-        total_tokens = total_in + total_out + total_reasoning + total_cache
+        total_tokens = total_in + total_out
+        if target_file:
+            try:
+                recent_steps, _ = read_native_events(target_file, 'codex')
+            except (OSError, ValueError):
+                recent_steps = []
 
         tok_per_sec = 0
-        if is_active:
-            if step_burns:
-                tok_per_sec = max(25, min(300, step_burns[-1] // 2))
-            else:
-                tok_per_sec = 75
-
         thread_name = self._get_thread_title(sid)
         display_title = thread_name or f"Codex: {sid[:12]}"
 
         return {
             "agent_name": self.get_agent_name(),
             "session_id": sid,
-            "title": display_title if total_tokens > 0 else "Codex / Copilot: Idle",
+            "title": display_title if total_tokens > 0 else "Codex: Idle",
             "model_name": model_name,
             "max_context_tokens": max_context,
             "current_context_tokens": active_context,
@@ -331,9 +259,11 @@ class CodexAdapter(BaseAgentAdapter):
             "cache_efficiency": cache_eff,
             "tokens_per_step": int(total_tokens / len(recent_steps)) if recent_steps else 0,
             "tokens_per_sec": tok_per_sec,
+            "tokens_per_sec_available": False,
+            "token_semantics": "input includes cache; output includes reasoning",
             "session_elapsed_sec": elapsed_sec,
             "recent_steps_tokens": step_burns[-25:] if step_burns else [0],
-            "recent_steps": recent_steps[-6:],
+            "recent_steps": recent_steps[-1000:],
             "active_subagents": [],
             "is_active": is_active,
             "last_modified": last_modified

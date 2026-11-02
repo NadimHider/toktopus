@@ -9,7 +9,7 @@ CONFIG_DIR = Path.home() / ".config" / "toktopus"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 DEFAULT_CONFIG: Dict[str, Any] = {
-    "active_agent": "antigravity",
+    "active_agent": "auto",
     "plan_tier": "google-ai-pro",
     "pricing_model": "gemini-3.8-flash",
     "refresh_rate": 0.3,

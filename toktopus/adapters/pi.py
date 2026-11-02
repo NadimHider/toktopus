@@ -56,13 +56,13 @@ class PiAgentAdapter(BaseAgentAdapter):
         if self._cached_telemetry and (now - self._last_check_time) < 0.3:
             return self._cached_telemetry
 
-        model_name = "Pi-3.5 Coding"
+        model_name = "Unknown"
         total_in = 0
         total_out = 0
         total_cache = 0
         total_reason = 0
         is_active = False
-        step_burns = [2000, 4500, 8000]
+        step_burns = []
         recent_steps = []
 
 
@@ -95,30 +95,9 @@ class PiAgentAdapter(BaseAgentAdapter):
                     pass
 
 
-        if total_in == 0 and total_out == 0:
-            total_in = 18_500
-            total_out = 3_200
-            total_cache = 84_000
-            total_reason = 1_500
-            is_active = False
-
         total_tok = total_in + total_out + total_cache + total_reason
         denom = total_in + total_cache
         cache_eff = round((total_cache / denom * 100.0), 1) if denom > 0 else 0.0
-
-        recent_steps = [
-            {
-                "index": 1,
-                "type": "PROMPT_TURN",
-                "status": "DONE",
-                "tools": ["workspace_search"],
-                "input_tokens": total_in // 2,
-                "output_tokens": total_out // 2,
-                "cache_tokens": total_cache // 2,
-                "reasoning_tokens": total_reason // 2,
-                "total_tokens": (total_in + total_out + total_cache) // 2
-            }
-        ]
 
         self._cached_telemetry = {
             "agent_name": self.get_agent_name(),
@@ -133,12 +112,14 @@ class PiAgentAdapter(BaseAgentAdapter):
             "total_tokens": total_tok,
             "cache_efficiency": cache_eff,
             "tokens_per_step": total_tok // max(1, len(recent_steps)),
-            "tokens_per_sec": 85 if is_active else 0,
+            "tokens_per_sec": 0,
+            "tokens_per_sec_available": False,
+            "current_context_available": False,
             "recent_steps_tokens": step_burns,
             "recent_steps": recent_steps,
             "active_subagents": [],
             "is_active": is_active,
-            "session_elapsed_sec": 180.0
+            "session_elapsed_sec": 0.0
         }
         self._last_check_time = now
         return self._cached_telemetry

@@ -2,6 +2,42 @@
 
 # TOKTOPUS
 
+### Local observability preview
+
+Toktopus now records local session metadata and observed tool events without a
+monitoring-service login or model calls. In the dashboard, press **J** for history,
+**D** for diagnostics, and **H** for cached LiveNerf Model Health. Detected local
+agents are checked every five seconds while history recording is enabled.
+In history, use **[** / **]** to select a recent session and **Enter** to open its
+observed timeline; **J** returns to history.
+
+```bash
+toktopus --history
+toktopus --history --search codex
+toktopus --timeline SESSION_ID --agent codex
+toktopus --diagnostics --agent opencode
+toktopus --import-otlp trace.json
+toktopus --timeline TRACE_ID --agent otel:SERVICE_NAME
+toktopus --model-health
+toktopus --refresh-model-health
+toktopus --no-history
+```
+
+History is stored in `~/.config/toktopus/history.sqlite3` with bounded row retention.
+It omits prompts, tool arguments and tool outputs. It records observations while
+Toktopus runs, not all past sessions automatically. Imported OTLP JSON preserves
+span parent IDs and duration; it does not start a collector server. Tool failures
+and repeated activity are deterministic evidence, not LLM evaluations.
+
+Account quotas are **Unavailable** without a verified source. Costs are estimated
+API-equivalent costs, not a subscription bill. Missing token speeds/context remain
+unavailable. Normal monitoring makes no model requests and adds no API charges.
+The coding agents themselves may still incur their usual charges. LiveNerf refresh
+downloads public results only when explicitly requested; it never runs benchmarks.
+
+See [reference research and coverage](docs/OBSERVABILITY-RESEARCH.md) for the 15-project
+comparison, implemented capabilities, remaining work, privacy and platform limits.
+
 **A local terminal dashboard for coding-agent telemetry, costs, and system activity.**
 
 [![Stars](https://img.shields.io/github/stars/NadimHider/toktopus?style=for-the-badge&logo=github&color=0f172a&labelColor=090d16)](https://github.com/NadimHider/toktopus/stargazers)

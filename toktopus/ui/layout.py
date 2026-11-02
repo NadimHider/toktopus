@@ -24,7 +24,6 @@ from toktopus.ui.charts import (
     format_metric_number,
     large_cache_gauge,
     mini_cpu_gauge,
-    quota_gauge,
     relative_benchmark_bar,
     token_composition_tank,
 )
@@ -129,8 +128,8 @@ def build_dashboard(
     step_burns = telemetry.get("recent_steps_tokens", [0])
 
     costs = calculate_costs(
-        input_tokens=in_tok,
-        output_tokens=out_tok,
+        input_tokens=max(0, in_tok - cache_tok) if active_agent_key == "codex" else in_tok,
+        output_tokens=max(0, out_tok - reason_tok) if active_agent_key == "codex" else out_tok,
         cache_read_tokens=cache_tok,
         model_key=effective_pricing_key,
         reasoning_tokens=reason_tok,
@@ -148,11 +147,11 @@ def build_dashboard(
         recent_tokens=current_ctx if current_ctx > 0 else (in_tok + out_tok),
         tier_override=plan_tier_key
     )
-    if limits["max_context"] > 0:
-        max_ctx = limits["max_context"]
 
     pet = get_cyber_pet()
     tok_per_sec = telemetry.get("tokens_per_sec", 0)
+    if telemetry.get("tokens_per_sec_available") is False:
+        tok_per_sec = "Unavailable"
 
 
 
@@ -180,28 +179,17 @@ def build_dashboard(
     context_table.add_row("[bold white]Model & Plan:[/bold white]", plan_str)
 
     ctx_gauge_str = f"{context_gauge(current_ctx, max_ctx, width=14)} [dim]({format_metric_number(current_ctx)} / {format_metric_number(max_ctx)})[/dim]"
-    context_table.add_row("[bold white]Active Context:[/bold white]", ctx_gauge_str)
+    context_table.add_row("[bold white]Active Context:[/bold white]", ctx_gauge_str if telemetry.get("current_context_available") is not False else "Unavailable from this source")
 
     ctx_pct = (current_ctx / max_ctx * 100) if max_ctx > 0 else 0.0
-    if ctx_pct >= 85.0:
+    if ctx_pct >= 85.0 and telemetry.get("current_context_available") is not False:
         context_table.add_row(
             "[bold #ff3366]! ALERT ![/bold #ff3366]",
             f"[bold #ff3366]{ctx_pct:.1f}% used. High memory load, consider compacting.[/bold #ff3366]"
         )
 
-    status_color = "#00ff88" if limits["status"] == "SAFE" else ("#ffe600" if limits["status"] == "WARN" else "#ff3366")
-    context_table.add_row(
-        "[bold white]Minute Limit:[/bold white]",
-        f"{quota_gauge(limits['tpm_used'], limits['max_tpm'], width=10)} [{status_color}][{limits['status']}][/{status_color}] [dim](Rem: {format_metric_number(limits['tpm_remaining'])})[/dim]"
-    )
-    context_table.add_row(
-        "[bold white]Request Rate:[/bold white]",
-        f"{quota_gauge(limits['rpm_used'], limits['max_rpm'], width=10)} [dim]({limits['rpm_used']} / {limits['max_rpm']} rpm)[/dim]"
-    )
-    context_table.add_row(
-        "[bold white]Tier Limit:[/bold white]",
-        f"[#00ff88]{format_metric_number(limits['max_rpd'])} RPD[/#00ff88] [dim]|[/dim] [#ffe600]${limits.get('monthly_allowance_usd', 0.0):.1f}/mo pool[/#ffe600]"
-    )
+    context_table.add_row("Account quota:", "Unavailable (local monitoring only)")
+    context_table.add_row("Source:", "Locally observed; D for diagnostics")
 
     layout["top_row"]["context_box"].update(
         Panel(context_table, title="[bold #00f3ff][CONTEXT & LIMITS][/bold #00f3ff]", border_style="#00f3ff", box=box.ROUNDED, padding=(0, 1))
@@ -269,7 +257,7 @@ def build_dashboard(
         f"[dim]In:[/dim] [#00f3ff]${costs['rate_in']:.2f}[/#00f3ff] [dim]| Out:[/dim] [#b026ff]${costs['rate_out']:.2f}[/#b026ff] [dim]| Cache:[/dim] [#00ff88]${costs['rate_cache']:.3f}[/#00ff88] [dim]/1M[/dim]"
     )
     billing_table.add_row(
-        "[bold white]Cumulative Cost:[/bold white]",
+        "[bold white]Estimated Cost:[/bold white]",
         f"[bold #ffe600]${costs['cost_spent_usd']:.4f}[/bold #ffe600] [dim](without cache: ${costs['cost_without_cache_usd']:.4f})[/dim]"
     )
 
@@ -288,7 +276,7 @@ def build_dashboard(
     )
 
     layout["middle_row"]["billing_box"].update(
-        Panel(billing_table, title="[bold #ffe600][SESSION BILLING & PRICING][/bold #ffe600]", border_style="#ffe600", box=box.ROUNDED, padding=(0, 1))
+        Panel(billing_table, title="[bold #ffe600][ESTIMATED API-EQUIVALENT COST][/bold #ffe600]", border_style="#ffe600", box=box.ROUNDED, padding=(0, 1))
     )
 
 
@@ -514,7 +502,7 @@ def build_dashboard(
 
 
     footer_text = Text()
-    footer_text.append(" 1-6 Agents  P Plan  M Model  B Bench  S Skills  E Edit  G Game  O Pet  F Feed  T Pet  R Refresh  Q Quit", style="white")
+    footer_text.append(" 1-6 Agents  J History  D Diagnostics  H Health  M Pricing  B Bench  S Skills  R Refresh  Q Quit", style="white")
 
     layout["footer"].update(Panel(footer_text, border_style="dim", box=box.ROUNDED))
 

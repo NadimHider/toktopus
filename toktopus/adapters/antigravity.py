@@ -332,9 +332,9 @@ class AntigravityAdapter(BaseAgentAdapter):
             if self._steps:
                 recent_out = self._steps[-1].get("output_tokens", 0) + self._steps[-1].get("reasoning_tokens", 0)
                 if recent_out > 0 and self._last_turn_duration_sec > 0:
-                    tokens_per_sec = max(10, min(600, int(recent_out / self._last_turn_duration_sec)))
+                    tokens_per_sec = int(recent_out / self._last_turn_duration_sec)
                 elif recent_out > 0:
-                    tokens_per_sec = max(30, min(300, recent_out // 2))
+                    tokens_per_sec = 0
                 else:
                     tokens_per_sec = 0
             else:
@@ -369,6 +369,7 @@ class AntigravityAdapter(BaseAgentAdapter):
             "cache_efficiency": cache_eff,
             "tokens_per_step": avg_tokens_per_step,
             "tokens_per_sec": tokens_per_sec,
+            "tokens_per_sec_available": bool(is_active and self._steps and self._last_turn_duration_sec > 0),
             "session_elapsed_sec": elapsed_sec,
             "recent_steps_tokens": self._step_burns[-25:] if self._step_burns else [0],
             "recent_steps": self._steps[-6:] if self._steps else [],

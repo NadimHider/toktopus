@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from toktopus.adapters.base import BaseAgentAdapter
+from toktopus.adapters.opencode_current import read_current_schema
 
 POSSIBLE_OPENCODE_DIRS = [
     Path(os.environ["OPENCODE_HOME"]) if os.environ.get("OPENCODE_HOME") else None,
@@ -21,6 +22,7 @@ class OpenCodeAdapter(BaseAgentAdapter):
         self._db_path = self._find_opencode_db()
         self._cached_session_id: Optional[str] = None
         self._last_session_check: float = 0.0
+        self._diagnostic_error: Optional[str] = None
 
     def _find_opencode_db(self) -> Optional[Path]:
         for d in POSSIBLE_OPENCODE_DIRS:
@@ -44,6 +46,7 @@ class OpenCodeAdapter(BaseAgentAdapter):
         return False
 
     def get_active_session_id(self) -> Optional[str]:
+        self._diagnostic_error = None
         now = time.time()
         if self._cached_session_id and (now - self._last_session_check) < 2.0:
             return self._cached_session_id
@@ -64,8 +67,8 @@ class OpenCodeAdapter(BaseAgentAdapter):
                 self._cached_session_id = str(row[0])
                 self._last_session_check = now
                 return self._cached_session_id
-        except Exception:
-            pass
+        except (sqlite3.Error, OSError) as exc:
+            self._diagnostic_error = f"OpenCode database unavailable or unsupported schema ({type(exc).__name__})."
         finally:
             if conn:
                 try:
@@ -87,6 +90,16 @@ class OpenCodeAdapter(BaseAgentAdapter):
         return 500_000
 
     def get_session_telemetry(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        self._diagnostic_error = None
+        if not self._db_path or not self._db_path.exists():
+            self._db_path = self._find_opencode_db()
+        if self._db_path:
+            try:
+                current = read_current_schema(self._db_path, session_id)
+                if current is not None:
+                    return current
+            except (sqlite3.Error, OSError, ValueError, TypeError) as exc:
+                self._diagnostic_error = f'OpenCode database unavailable or unsupported schema ({type(exc).__name__}).'
         sid = session_id or self.get_active_session_id()
 
         if not self._db_path or not self._db_path.exists():
@@ -94,6 +107,10 @@ class OpenCodeAdapter(BaseAgentAdapter):
 
         if not self._db_path or not self._db_path.exists() or not sid:
             return {
+                "data_status": "error" if self._diagnostic_error else "no-session",
+                "diagnostic_error": self._diagnostic_error,
+                "current_context_available": False,
+                "tokens_per_sec_available": False,
                 "agent_name": self.get_agent_name(),
                 "session_id": sid or "no-session",
                 "title": "OpenCode: Idle",
@@ -132,6 +149,7 @@ class OpenCodeAdapter(BaseAgentAdapter):
         model_name = "opencode-zen"
         step_burns: List[int] = []
         recent_steps: List[Dict[str, Any]] = []
+        session_found = False
 
         conn = None
         try:
@@ -157,12 +175,8 @@ class OpenCodeAdapter(BaseAgentAdapter):
             cur.execute(sql, (sid,))
             row = cur.fetchone()
 
-            if not row:
-                sql_latest = f"SELECT {', '.join(query_cols)} FROM session_v2 ORDER BY time_updated DESC LIMIT 1;"
-                cur.execute(sql_latest)
-                row = cur.fetchone()
-
             if row:
+                session_found = True
                 (
                     row_sid, row_title, slug, in_tok, out_tok, cache_read_tok,
                     reason_tok, cache_write_tok, cost_val, model_json, t_create, t_update
@@ -175,7 +189,8 @@ class OpenCodeAdapter(BaseAgentAdapter):
                 total_cache_write = cache_write_tok or 0
                 total_reasoning = reason_tok or 0
                 session_cost = float(cost_val or 0.0)
-                active_context = total_in + total_cache_read
+                # Session totals do not describe the current context window.
+                active_context = 0
 
                 display_title = row_title or slug or sid[:10]
                 title = f"OpenCode: {display_title}"
@@ -229,9 +244,6 @@ class OpenCodeAdapter(BaseAgentAdapter):
                                 cache_msg = usage.get("cache_read", 0) or usage.get("cached_tokens", 0)
                                 reason_msg = usage.get("reasoning", 0) or usage.get("thinking_tokens", 0)
                                 step_tok = usage.get("total") or (in_msg + out_msg + cache_msg + reason_msg)
-                            if step_tok == 0 and "text" in d:
-                                step_tok = len(d["text"]) // 4
-                                in_msg = step_tok
                         except Exception:
                             pass
 
@@ -251,8 +263,8 @@ class OpenCodeAdapter(BaseAgentAdapter):
                     if step_tok > 0:
                         step_burns.append(step_tok)
 
-        except Exception:
-            pass
+        except (sqlite3.Error, OSError, ValueError, TypeError) as exc:
+            self._diagnostic_error = f"OpenCode database unavailable or unsupported schema ({type(exc).__name__})."
         finally:
             if conn:
                 try:
@@ -268,15 +280,13 @@ class OpenCodeAdapter(BaseAgentAdapter):
 
 
         tok_per_sec = 0
-        if is_active:
-            if step_burns:
-                tok_per_sec = max(20, min(350, step_burns[-1] // 2))
-            else:
-                tok_per_sec = 85
 
         max_ctx = self._get_context_limit(model_name)
 
         return {
+            "data_status": "error" if self._diagnostic_error else ("observed" if session_found else "no-session"),
+            "diagnostic_error": self._diagnostic_error,
+            "current_context_available": False,
             "agent_name": self.get_agent_name(),
             "session_id": sid,
             "title": title,
@@ -292,6 +302,7 @@ class OpenCodeAdapter(BaseAgentAdapter):
             "cache_efficiency": cache_eff,
             "tokens_per_step": avg_tokens_per_step,
             "tokens_per_sec": tok_per_sec,
+            "tokens_per_sec_available": False,
             "session_elapsed_sec": elapsed_sec,
             "session_cost": session_cost,
             "recent_steps_tokens": step_burns[-25:] if step_burns else [0],

@@ -113,7 +113,7 @@ def auto_detect_active_agent() -> str:
             return "claude"
         elif "cursor" in lbl:
             return "cursor"
-        elif "copilot" in lbl or "codex" in lbl:
+        elif "codex" in lbl:
             return "codex"
 
 

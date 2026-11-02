@@ -79,7 +79,7 @@ TIER_LIMITS: Dict[str, Dict[str, Any]] = {
         "description": "Cursor Pro monthly developer subscription"
     },
     "codex-pro": {
-        "tier_name": "Codex / Copilot Pro",
+        "tier_name": "Codex (configured estimate)",
         "plan_badge": "[CODEX PRO]",
         "max_context": 200_000,
         "max_rpm": 300,
@@ -87,7 +87,7 @@ TIER_LIMITS: Dict[str, Dict[str, Any]] = {
         "max_rpd": 20_000,
         "monthly_allowance_usd": 19.00,
         "is_subscription": True,
-        "description": "GitHub Copilot and OpenAI Codex developer plan"
+        "description": "OpenAI Codex configured plan"
     },
     "pi-pro": {
         "tier_name": "Pi Agent Pro",
@@ -132,7 +132,6 @@ PLAN_ALIASES: Dict[str, str] = {
     "cursor-pro": "cursor-pro",
     "codex": "codex-pro",
     "codex-pro": "codex-pro",
-    "copilot": "codex-pro",
     "pi": "pi-pro",
     "pi-pro": "pi-pro",
     "pi-standard": "pi-standard"
@@ -185,34 +184,14 @@ def estimate_account_limits(
     effective_plan = normalize_plan_key(tier_override or "", agent_key)
     limits = TIER_LIMITS.get(effective_plan, TIER_LIMITS["google-ai-pro"])
 
-    tpm_used = min(recent_tokens, limits["max_tpm"])
-    tpm_remaining = max(0, limits["max_tpm"] - tpm_used)
-    tpm_pct = round((tpm_used / limits["max_tpm"]) * 100, 1)
-
-    rpm_used = min(recent_requests, limits["max_rpm"])
-    rpm_remaining = max(0, limits["max_rpm"] - rpm_used)
-    rpm_pct = round((rpm_used / limits["max_rpm"]) * 100, 1)
-
-    status = "SAFE"
-    if tpm_pct > 80.0 or rpm_pct > 80.0:
-        status = "CRITICAL"
-    elif tpm_pct > 60.0 or rpm_pct > 60.0:
-        status = "WARN"
-
+    # Session totals cannot establish account quota usage or rate windows.
     return {
-        "plan_key": effective_plan,
-        "tier_name": limits["tier_name"],
-        "plan_badge": limits["plan_badge"],
-        "max_context": limits["max_context"],
-        "tpm_used": tpm_used,
-        "max_tpm": limits["max_tpm"],
-        "tpm_remaining": tpm_remaining,
-        "tpm_pct": tpm_pct,
-        "rpm_used": rpm_used,
-        "max_rpm": limits["max_rpm"],
-        "rpm_remaining": rpm_remaining,
-        "rpm_pct": rpm_pct,
-        "max_rpd": limits["max_rpd"],
+        "plan_key": effective_plan, "tier_name": limits["tier_name"],
+        "plan_badge": "[CONFIGURED ESTIMATE]", "max_context": limits["max_context"],
+        "tpm_used": None, "max_tpm": None, "tpm_remaining": None,
+        "tpm_pct": None, "rpm_used": None, "max_rpm": None,
+        "rpm_remaining": None, "rpm_pct": None, "max_rpd": None,
         "is_subscription": limits.get("is_subscription", False),
-        "status": status
+        "status": "UNAVAILABLE", "source": "unavailable",
+        "reason": "Local session totals do not establish account limits",
     }

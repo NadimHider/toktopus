@@ -16,7 +16,7 @@ class ReliabilityTests(unittest.TestCase):
             with patch.object(config, "CONFIG_FILE", path):
                 result = config.load_config()
             self.assertEqual(result["refresh_rate"], 0.3)
-            self.assertEqual(result["active_agent"], "antigravity")
+            self.assertEqual(result["active_agent"], "auto")
 
     def test_atomic_configuration_round_trip(self):
         with tempfile.TemporaryDirectory() as directory:

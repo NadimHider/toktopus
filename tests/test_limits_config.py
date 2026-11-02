@@ -54,11 +54,11 @@ class TestLimitsAndConfig(unittest.TestCase):
             tier_override="google-ai-pro"
         )
         self.assertEqual(res["tier_name"], "Google AI Pro Plan")
-        self.assertEqual(res["plan_badge"], "[PRO PLAN]")
+        self.assertEqual(res["plan_badge"], "[CONFIGURED ESTIMATE]")
         self.assertEqual(res["max_context"], 2_000_000)
-        self.assertEqual(res["max_tpm"], 4_000_000)
-        self.assertEqual(res["status"], "SAFE")
-        self.assertGreater(res["tpm_remaining"], 3_900_000)
+        self.assertIsNone(res["max_tpm"])
+        self.assertEqual(res["status"], "UNAVAILABLE")
+        self.assertIsNone(res["tpm_remaining"])
 
     def test_plan_cycling(self):
         nxt = get_next_plan("google-ai-pro", "antigravity")
