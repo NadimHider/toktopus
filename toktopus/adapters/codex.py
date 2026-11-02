@@ -145,7 +145,7 @@ class CodexAdapter(BaseAgentAdapter):
                     if sid in rf.name:
                         target_file = rf
                         break
-                if not target_file:
+                if not target_file and not session_id:
                     candidates = list(sessions_root.rglob("rollout-*.jsonl"))
                     if candidates:
                         candidates.sort(key=lambda x: x.stat().st_mtime, reverse=True)
@@ -170,6 +170,8 @@ class CodexAdapter(BaseAgentAdapter):
                             payload = d.get("payload", {})
 
                             if t == "session_meta":
+                                if payload.get('id'):
+                                    sid = str(payload['id'])
                                 ts_str = payload.get("timestamp")
                                 if ts_str:
                                     clean_ts = ts_str.replace("Z", "+00:00")
@@ -245,6 +247,8 @@ class CodexAdapter(BaseAgentAdapter):
         display_title = thread_name or f"Codex: {sid[:12]}"
 
         return {
+            'data_status': 'observed' if target_file else 'no-session',
+            'current_context_available': bool(target_file and active_context > 0),
             "agent_name": self.get_agent_name(),
             "session_id": sid,
             "title": display_title if total_tokens > 0 else "Codex: Idle",

@@ -1,6 +1,7 @@
 """Bounded local transcript metadata reader for replay without prompt retention."""
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 
 MAX_BYTES = 16_000_000
@@ -16,6 +17,7 @@ def read_native_events(path, agent):
     if len(data) > MAX_BYTES:
         raise ValueError('Transcript exceeds 16 MB; use a smaller export')
     for index, line in enumerate(data.splitlines(), 1):
+        event_start = len(events)
         try:
             record = json.loads(line)
             if not isinstance(record, dict):
@@ -49,6 +51,14 @@ def read_native_events(path, agent):
                         event = calls.get(block.get('tool_use_id'))
                         if event is not None:
                             event['status'] = 'ERROR' if block.get('is_error') else 'DONE'
+            timestamp = record.get('timestamp')
+            if len(events) > event_start and timestamp:
+                try:
+                    epoch = datetime.fromisoformat(timestamp.replace('Z', '+00:00')).timestamp() if isinstance(timestamp, str) and 'T' in timestamp else float(timestamp)
+                    for event in events[event_start:]:
+                        event['timestamp'] = epoch
+                except (ValueError, TypeError, OverflowError):
+                    pass
         except (ValueError, TypeError, AttributeError):
             skipped += 1
     return events, skipped

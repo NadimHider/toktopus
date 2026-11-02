@@ -170,11 +170,11 @@ class ObservabilityTests(unittest.TestCase):
             stack.enter_context(patch.object(cli, 'init_keyboard'))
             restore = stack.enter_context(patch.object(cli, 'restore_keyboard'))
             live = stack.enter_context(patch.object(cli, 'Live'))
-            stack.enter_context(patch.object(cli, 'get_pressed_key', side_effect=['h', 'd', 'j', ']', '\r', 'j', 'q']))
+            stack.enter_context(patch.object(cli, 'get_pressed_key', side_effect=['h', 'd', 'j', 'n', 'p', ']', '\r', 'n', 'p', 'j', 'q']))
             stack.enter_context(patch('sys.stdin.isatty', return_value=True))
             stack.enter_context(patch('sys.argv', ['toktopus']))
             cli.main()
-        self.assertEqual(live.return_value.__enter__.return_value.update.call_count, 6)
+        self.assertEqual(live.return_value.__enter__.return_value.update.call_count, 10)
         restore.assert_called_once()
 
     def test_export_marks_unavailable_and_avoids_codex_double_billing(self):
@@ -190,6 +190,60 @@ class ObservabilityTests(unittest.TestCase):
         self.assertIsNone(result['billing']['actual_billed_usd'])
         expected = calculate_costs(input_tokens=60, output_tokens=15, cache_read_tokens=40, reasoning_tokens=5, model_key='o3-mini', step_count=1)
         self.assertEqual(result['billing']['cost_spent_usd'], expected['cost_spent_usd'])
+
+    def test_history_pages_sort_by_source_activity_and_do_not_overlap(self):
+        for number in range(9):
+            self.store.record('claude', dict(session_id=f's{number}', last_modified=100 - number))
+        first = self.store.sessions(limit=6)
+        second = self.store.sessions(limit=6, offset=6)
+        self.assertEqual([row['session_id'] for row in first], [f's{i}' for i in range(6)])
+        self.assertEqual([row['session_id'] for row in second], ['s6', 's7', 's8'])
+
+    def test_metadata_allowlist_rejects_nested_payloads_and_nonfinite_values(self):
+        self.store.record('claude', dict(session_id='s', input_tokens={'prompt': 'PRIVATE'}, total_tokens=float('nan'), recent_steps=[dict(index=1, tools=[{'name': 'Read', 'input': 'PRIVATE'}, {'input': 'PRIVATE'}], duration_sec=float('inf'))]))
+        history = json.dumps(self.store.sessions()) + json.dumps(self.store.timeline('claude', 's'))
+        self.assertNotIn('PRIVATE', history)
+        self.assertNotIn('NaN', history)
+        self.assertNotIn('Infinity', history)
+        self.assertEqual(self.store.timeline('claude', 's')[0]['tools'], ['Read'])
+
+    def test_missing_otlp_counters_and_timestamps_stay_unavailable(self):
+        import_otlp(self.otlp([dict(traceId='trace', spanId='span')]), self.store)
+        event = self.store.timeline('otel:local', 'trace')[0]
+        self.assertEqual(event['event_id'], 'span')
+        for key in ('total_tokens', 'input_tokens', 'output_tokens', 'duration_sec', 'timestamp'):
+            self.assertNotIn(key, event)
+
+    def test_imported_timeline_orders_by_source_time_and_supports_older_pages(self):
+        from rich.console import Console
+
+        from toktopus.ui.history import render_timeline
+        spans = [dict(traceId='t', spanId='late', startTimeUnixNano='3000000000', endTimeUnixNano='4000000000'), dict(traceId='t', spanId='early', startTimeUnixNano='1000000000', endTimeUnixNano='2000000000')]
+        import_otlp(self.otlp(spans), self.store)
+        self.assertEqual([event['event_id'] for event in self.store.timeline('otel:local', 't')], ['early', 'late'])
+        output = io.StringIO()
+        Console(file=output, width=180).print(render_timeline(self.store, 'otel:local', 't', limit=1, offset=1))
+        self.assertIn('early', output.getvalue())
+        self.assertNotIn('late', output.getvalue())
+
+    def test_native_timestamp_applies_to_all_tools_in_a_record(self):
+        path = self.root / 'timestamps.jsonl'
+        path.write_text(json.dumps(dict(timestamp='2026-11-02T00:00:00Z', message=dict(content=[dict(type='tool_use', id='a', name='Read'), dict(type='tool_use', id='b', name='Read')]))))
+        events, skipped = read_native_events(path, 'claude')
+        self.assertEqual(skipped, 0)
+        self.assertEqual(len(events), 2)
+        self.assertEqual(events[0]['timestamp'], events[1]['timestamp'])
+
+    def test_codex_explicit_missing_session_does_not_use_another_rollout(self):
+        from toktopus.adapters import codex
+        sessions = self.root / 'sessions'
+        sessions.mkdir()
+        (sessions / 'rollout-other.jsonl').write_text(json.dumps(dict(type='session_meta', payload=dict(id='other'))))
+        with patch.object(codex, 'CODEX_DIR', self.root), patch.object(codex, 'get_system_telemetry', return_value={}):
+            result = codex.CodexAdapter().get_session_telemetry('missing')
+        self.assertEqual(result['session_id'], 'missing')
+        self.assertEqual(result['data_status'], 'no-session')
+        self.assertFalse(result['current_context_available'])
 
 
 if __name__ == '__main__':

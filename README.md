@@ -1,184 +1,187 @@
-<div align="center">
+# Toktopus
 
-# TOKTOPUS
+A local terminal dashboard for coding-agent usage, observed tool activity, session history, and model health.
 
-### Local observability preview
+[![CI](https://github.com/NadimHider/toktopus/actions/workflows/ci.yml/badge.svg)](https://github.com/NadimHider/toktopus/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[Latest release](https://github.com/NadimHider/toktopus/releases/latest) | [Report an issue](https://github.com/NadimHider/toktopus/issues/new) | [Research and roadmap](docs/OBSERVABILITY-RESEARCH.md)
 
-Toktopus now records local session metadata and observed tool events without a
-monitoring-service login or model calls. In the dashboard, press **J** for history,
-**D** for diagnostics, and **H** for cached LiveNerf Model Health. Detected local
-agents are checked every five seconds while history recording is enabled.
-In history, use **[** / **]** to select a recent session and **Enter** to open its
-observed timeline; **J** returns to history.
+Toktopus reads available local agent records and host metrics. It requires no monitoring-service account, API key, cloud backend, or Docker stack. Normal monitoring makes no model requests and adds no inference charges. Your coding agents still use their own accounts and may incur their usual charges.
+
+## Install or update
+
+Requires Python 3.9 or newer. Use an interactive terminal for the live dashboard.
+
+Install the v1.7.0 release directly from GitHub:
 
 ```bash
-toktopus --history
-toktopus --history --search codex
-toktopus --timeline SESSION_ID --agent codex
-toktopus --diagnostics --agent opencode
-toktopus --import-otlp trace.json
-toktopus --timeline TRACE_ID --agent otel:SERVICE_NAME
-toktopus --model-health
-toktopus --refresh-model-health
-toktopus --no-history
+python -m pip install --upgrade "git+https://github.com/NadimHider/toktopus.git@v1.7.0"
+python -m toktopus
 ```
 
-History is stored in `~/.config/toktopus/history.sqlite3` with bounded row retention.
-It omits prompts, tool arguments and tool outputs. It records observations while
-Toktopus runs, not all past sessions automatically. Imported OTLP JSON preserves
-span parent IDs and duration; it does not start a collector server. Tool failures
-and repeated activity are deterministic evidence, not LLM evaluations.
+This installation method requires Git. You can also install the wheel attached to the [release](https://github.com/NadimHider/toktopus/releases/tag/v1.7.0) with `python -m pip install --upgrade PATH_TO_WHEEL`.
 
-Account quotas are **Unavailable** without a verified source. Costs are estimated
-API-equivalent costs, not a subscription bill. Missing token speeds/context remain
-unavailable. Normal monitoring makes no model requests and adds no API charges.
-The coding agents themselves may still incur their usual charges. LiveNerf refresh
-downloads public results only when explicitly requested; it never runs benchmarks.
+The `toktopus` command is available when Python's scripts directory is on your PATH. Otherwise, use `python -m toktopus`, which runs the same application.
 
-See [reference research and coverage](docs/OBSERVABILITY-RESEARCH.md) for the 15-project
-comparison, implemented capabilities, remaining work, privacy and platform limits.
-
-**A local terminal dashboard for coding-agent telemetry, costs, and system activity.**
-
-[![Stars](https://img.shields.io/github/stars/NadimHider/toktopus?style=for-the-badge&logo=github&color=0f172a&labelColor=090d16)](https://github.com/NadimHider/toktopus/stargazers)
-[![Forks](https://img.shields.io/github/forks/NadimHider/toktopus?style=for-the-badge&logo=github&color=0f172a&labelColor=090d16)](https://github.com/NadimHider/toktopus/network/members)
-[![Watchers](https://img.shields.io/github/watchers/NadimHider/toktopus?style=for-the-badge&logo=github&color=0f172a&labelColor=090d16)](https://github.com/NadimHider/toktopus/watchers)
-[![Issues](https://img.shields.io/github/issues/NadimHider/toktopus?style=for-the-badge&logo=github&color=00ff66&labelColor=090d16)](https://github.com/NadimHider/toktopus/issues)
-[![Last Commit](https://img.shields.io/github/last-commit/NadimHider/toktopus?style=for-the-badge&color=00ccff&labelColor=090d16)](https://github.com/NadimHider/toktopus/commits/main)
-[![Repo Size](https://img.shields.io/github/repo-size/NadimHider/toktopus?style=for-the-badge&color=ff0055&labelColor=090d16)](https://github.com/NadimHider/toktopus)
-[![Top Language](https://img.shields.io/github/languages/top/NadimHider/toktopus?style=for-the-badge&color=ffaa00&labelColor=090d16)](https://github.com/NadimHider/toktopus)
-[![License](https://img.shields.io/github/license/NadimHider/toktopus?style=for-the-badge&color=a855f7&labelColor=090d16)](./LICENSE)
-
-[Documentation](#overview) · [Quick Start](#quick-start) · [Architecture](#system-architecture) · [Report Issue](https://github.com/NadimHider/toktopus/issues/new?labels=bug) · [Request Feature](https://github.com/NadimHider/toktopus/issues/new?labels=enhancement)
-
-<br />
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/screenshot.png">
-  <source media="(prefers-color-scheme: light)" srcset="./assets/screenshot.png">
-  <img alt="Toktopus terminal dashboard with sample telemetry" src="./assets/screenshot.png" width="100%" style="max-width: 880px; border: 1px solid #1e293b; border-radius: 4px;">
-</picture>
-
-</div>
-
----
-
-> [!IMPORTANT]
-> Toktopus normalizes locally available coding-agent telemetry through agent-specific adapters and displays it alongside host metrics. Pricing and account-limit figures are estimates based on the configured model and plan, not authoritative billing or quota data.
-
-## Overview
-
-Toktopus is a Python terminal application for monitoring Antigravity, Claude Code, OpenCode, Cursor, Codex, and Pi. It reads locally available session data, presents a Rich dashboard, and can export a JSON snapshot for downstream scripts. The dashboard includes a skill vault, model benchmark table, an interactive companion, and a terminal Space Impact game. A separate browser edition of the game is bundled with the package.
-
-### Core Capabilities
-
-- **Agent telemetry:** Agent adapters discover local sessions and normalize available token, model, and activity data into a dashboard-friendly snapshot.
-- **Costs and limits:** Pricing tables and plan heuristics calculate estimated session costs, cache savings, and quota indicators. Host CPU, memory, process, disk, network, and available GPU metrics are collected with psutil and optional NVIDIA tooling.
-- **Terminal workflows:** Switch agents and views interactively, inspect or modify installed skills, display benchmarks, and export snapshots as JSON.
-- **Embedded arcade subsystem (Space Impact):** The terminal shooter uses a fixed-step simulation and persists its high score in the application configuration. The optional browser edition uses a delta-time animation loop, bounded projectile and particle pools, collision boxes, wave patterns, boss phases, power-ups, and a CRT-inspired canvas.
-
-## Quick Start
-
-Requires Python 3.9 or newer and an interactive terminal for the live dashboard and terminal game.
+To work from a checkout:
 
 ```bash
 git clone https://github.com/NadimHider/toktopus.git
 cd toktopus
 python -m pip install .
-toktopus
+python -m toktopus
 ```
+
+To update an existing checkout on `main`:
 
 ```bash
-toktopus --once
-toktopus --export telemetry.json
-toktopus --game
-toktopus --web-game
+git pull --ff-only
+python -m pip install --upgrade .
+```
+
+## What is new in v1.7.0
+
+- Local SQLite session history with metadata search and paging.
+- Selectable tool timelines with observed status, available timestamps, failure counts, and repeated-activity hints.
+- Automatic history collection from detected local agents every five seconds. Selected-agent telemetry is cached for two seconds.
+- Local OTLP JSON imports with trace, span, parent, duration, and available token metadata.
+- LiveNerf Model Health with explicit refresh, a validated local cache, source provenance, and offline fallback.
+- Diagnostics for missing sources and unsupported database schemas.
+- Corrected Codex token accounting, an OpenCode session/message/part reader, and removal of fabricated activity and token speeds.
+- Unavailable account quotas are shown explicitly. Estimated costs are separated from actual billing.
+
+Read the [release notes](docs/releases/v1.7.0.md) for compatibility details.
+
+## Dashboard controls
+
+| Key | Action |
+| --- | --- |
+| `1` to `6` | Select Antigravity, Claude Code, OpenCode, Cursor, Codex, or Pi |
+| `J` | Open History or return from a timeline to History |
+| `[` / `]` | Select a session on the current History page |
+| `Enter` | Open the selected session's observed timeline |
+| `N` / `P` | History: next/previous page. Timeline: older/newer events |
+| `D` | Open Diagnostics; press again to return to Overview |
+| `H` | Open cached Model Health; press again to return to Overview |
+| `R` | Invalidate the telemetry cache and refresh the selected agent |
+| `M` | Cycle the estimated pricing model |
+| `P` in Overview | Cycle legacy configured plan estimates |
+| `B` | Toggle the bundled benchmark view |
+| `S` / `E` | Expand skills or open the skill editor |
+| `O` / `G` | Open the companion lounge or terminal game |
+| `F` / `T` | Feed or pet the companion |
+| `Q` | Quit |
+
+History and timeline pages show six rows in the live dashboard. Command-line views support larger pages and metadata search.
+
+## History and timelines
+
+```bash
+python -m toktopus --history
+python -m toktopus --history --search codex
+python -m toktopus --history --limit 20 --offset 20
+python -m toktopus --timeline SESSION_ID --agent codex
+python -m toktopus --timeline SESSION_ID --agent claude --limit 20 --offset 20
+python -m toktopus --no-history
+```
+
+History stores the latest session snapshot rather than adding cumulative counters every time the dashboard refreshes. Repeated observations update existing events. Sessions are ordered by source activity time when available, and by observation time otherwise.
+
+The timeline displays available tool evidence. Explicit tool errors and exit codes drive failure counts. Three consecutive events naming the same tools produce a repeated-activity hint, not a finding that the agent is definitely stuck.
+
+Toktopus records observations while it runs. It does not automatically rebuild every past session, and polling can miss events between reads. Native tool details currently have the strongest coverage in Claude Code, Codex, and the supported OpenCode database schema. A timeline is an inspection view, not a rerun of the agent.
+
+## Import OpenTelemetry traces
+
+```bash
+python -m toktopus --import-otlp trace.json
+python -m toktopus --history --search otel:
+python -m toktopus --timeline TRACE_ID --agent otel:SERVICE_NAME
+```
+
+The importer accepts OTLP JSON documents with `resourceSpans`, `scopeSpans`, and `spans`. It reads standard `gen_ai` usage and tool metadata, retains parent span IDs, and calculates duration when both timestamps exist. Missing counters remain unavailable. Nested span counters are not summed into an invented session total.
+
+Imports are limited to 8 MB and 10,000 spans. Prompts, tool arguments, outputs, and arbitrary span attributes are omitted from the history store. This release does not start an OTLP network receiver or automatically instrument unrelated applications.
+
+## Model Health with LiveNerf
+
+```bash
+python -m toktopus --refresh-model-health
+python -m toktopus --model-health
+```
+
+The first command downloads public [LiveNerf results](https://github.com/ninjahawk/livenerf). The second reads the cached copy without network access. The `H` dashboard view is also offline.
+
+Model Health shows recent aggregate observations, benchmark-family detail in the command-line view, sample counts, errors, and available output-token medians. Provenance includes the source URL, retrieval time, content SHA-256, CLI version, and harness hash. Failed refreshes preserve the last valid cached data. Retrievals older than 48 hours are marked stale.
+
+Toktopus does not run LiveNerf benchmarks or infer a statistical degradation verdict from a daily score. Upstream observations do not measure the quality of your own coding session. Aggregate and family rows overlap and are never added together.
+
+## Agent coverage and diagnostics
+
+| Agent | Available local source | Limitations |
+| --- | --- | --- |
+| Antigravity | Available local session logs and metadata | Format and timing availability vary by installed version |
+| Claude Code | Local project/session records and JSONL tool events | Bounded recent-file discovery; not a complete historical import |
+| OpenCode | Read-only session/message/part database reader, with legacy schema fallback | Unsupported schemas report diagnostics; context occupancy is unavailable |
+| Cursor | Available local tracking records | Best effort; some usage and tool details are not recorded locally |
+| Codex | Local rollout JSONL and session index | Separate from GitHub Copilot; token timing may be unavailable |
+| Pi | Legacy local JSON records | Current Pi coding-agent JSONL support remains future work |
+
+```bash
+python -m toktopus --diagnostics --agent opencode
+python -m toktopus --once --agent codex
+python -m toktopus --export telemetry.json --agent claude
+```
+
+Account quotas are unavailable without a verified source. Local token totals cannot establish account-wide usage, billing, or remaining subscription capacity. Costs use configured pricing or an agent-reported estimate and are not an authoritative bill. Missing throughput and context measurements remain unavailable.
+
+Host CPU, memory, disk, network, process, and available GPU metrics describe the local machine. They do not establish which agent caused every system change.
+
+## Storage and privacy
+
+Toktopus uses these local files:
+
+| File | Purpose |
+| --- | --- |
+| `~/.config/toktopus/config.json` | Dashboard settings |
+| `~/.config/toktopus/history.sqlite3` | Session snapshots and observed event metadata |
+| `~/.config/toktopus/livenerf.json` | Cached public benchmark results |
+
+History retains at most 2,000 sessions and 50,000 events. Row limits do not guarantee a fixed SQLite file size. Stop the app before manually removing its history database.
+
+History omits prompts, tool arguments, and tool outputs. Session IDs, model names, tool names, timestamps, and other retained metadata can still be sensitive. Existing adapters read local source records, and snapshot exports can include session and host details. Review exports before sharing them.
+
+Use `--no-history` to disable recording and automatic background discovery for that run. Normal monitoring does not upload telemetry, inspect credential stores, change agent authentication, install certificates, or run model evaluations.
+
+## Other tools
+
+The app also includes a skill vault, bundled benchmark table, companion lounge, terminal Space Impact game, and a standalone browser game. The bundled benchmark table is separate from LiveNerf and should not be treated as a live capability measurement.
+
+```bash
+python -m toktopus --skills
+python -m toktopus --benchmarks
+python -m toktopus --pet
+python -m toktopus --game
+python -m toktopus --web-game
+python -m toktopus --help
+```
+
+The skill editor can modify installed skills when explicitly used. Browser and terminal game scores are stored separately. Use `--no-color` or `NO_COLOR=1` for plain output.
+
+## Development
+
+```bash
+python -m pip install .
 python -m unittest discover -s tests
+python -m pip install ruff build
+python -m ruff check toktopus tests
+python -m build
 ```
 
-> [!TIP]
-> Use `toktopus --once` or `--export PATH` for non-interactive jobs, and set `NO_COLOR=1` or pass `--no-color` for plain output. An export can contain session and host details; review it before sharing.
+The runtime depends on Rich and psutil. Local storage, imports, and public result fetching use the Python standard library. CI runs tests on Linux, Windows, and macOS across supported Python versions.
 
-## Configuration & Controls
+See [reference research and remaining work](docs/OBSERVABILITY-RESEARCH.md) for the observability-platform comparison, source coverage, and roadmap. This release does not claim feature parity with all referenced platforms.
 
-Settings are stored in `~/.config/toktopus/config.json`. The browser game stores its own high score in browser local storage when available. Browser local-storage behavior for local files depends on the browser.
+## License
 
-| Action / Command | Primary Trigger | Description |
-| :--- | :---: | :--- |
-| Select agent | <kbd>1</kbd>–<kbd>6</kbd> or `--agent NAME` | Select Antigravity, Claude, OpenCode, Cursor, Codex, or Pi; `auto` attempts detection. |
-| Change plan or model | <kbd>P</kbd> / <kbd>M</kbd> | Cycle plan estimates or pricing models. `--plan` sets a plan at launch. |
-| Dashboard views | <kbd>B</kbd> / <kbd>S</kbd> / <kbd>E</kbd> | Toggle benchmarks, expand skills, or edit a skill. |
-| Pet and arcade | <kbd>O</kbd> / <kbd>G</kbd> | Open the pet lounge or terminal game; <kbd>F</kbd> feeds and <kbd>T</kbd> pets the companion. |
-| Refresh / quit | <kbd>R</kbd> / <kbd>Q</kbd> | Refresh immediately or exit. `--rate SECONDS` controls the refresh interval, default 0.3. |
-| Snapshot / export | `--once` / `--export PATH` | Print one dashboard or write a JSON snapshot and exit. |
-| Skills | `--skills`, `--get-skill NAME`, `--modify-skill NAME`, `--copy-skill NAME` | List, inspect, edit, or copy skills; see `toktopus --help` for required companion arguments. |
-| Space Impact: Move | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> / <kbd>Arrows</kbd> | Move in either game edition. The browser edition also supports pointer and touch controls. |
-| Space Impact: Fire | <kbd>Space</kbd> / <kbd>Shift</kbd> | Fire in either edition; <kbd>Shift</kbd> fires heavy ordnance in the browser edition. |
-| Space Impact: Pause and filter | <kbd>P</kbd> / <kbd>Esc</kbd> / <kbd>C</kbd> | Terminal: <kbd>P</kbd> pauses, <kbd>Q</kbd> or <kbd>Esc</kbd> exits. Browser: <kbd>Esc</kbd> pauses and <kbd>C</kbd> toggles scanlines. <kbd>R</kbd> restarts after game over. |
-
-Run `toktopus --help` for all flags, including `--benchmarks`, `--pet`, skill editing modes, and version information.
-
-## System Architecture
-
-```mermaid
-flowchart TD
-    CLI[CLI and keyboard loop] --> Adapters[Agent adapters]
-    Adapters --> Sources[Local logs, session files, and databases]
-    CLI --> System[Host telemetry]
-    CLI --> Config[Local configuration]
-    CLI --> Core[Pricing, limits, benchmarks, skills, and pet]
-    Adapters --> Dashboard[Rich terminal dashboard]
-    System --> Dashboard
-    Core --> Dashboard
-    CLI --> Export[JSON snapshot]
-    CLI --> TerminalGame[Terminal Space Impact]
-    CLI --> BrowserGame[Bundled browser Space Impact]
-    BrowserGame --> Canvas[Canvas, animation loop, and local storage]
-```
-
-The terminal game is entered from the dashboard or with `--game`; the standalone browser game is opened with `--web-game`. It runs in its own browser page rather than inside the Rich terminal dashboard.
-
-<details>
-<summary><strong>Directory Structure</strong></summary>
-
-```text
-.
-├── .github/workflows/         Continuous integration
-├── assets/                    Dashboard and browser-game previews
-├── data/                      Benchmark data
-├── scripts/                   Platform installers
-├── tests/                     Unit tests
-├── toktopus/
-│   ├── adapters/              Agent-specific data readers
-│   ├── core/                  Configuration, telemetry, pricing, limits, skills, pet
-│   ├── ui/                    Rich charts, layout, and theme
-│   ├── web/space-impact.html  Self-contained browser game
-│   ├── cli.py                 CLI and terminal event loop
-│   └── game.py                Terminal game
-├── pyproject.toml             Package metadata and dependencies
-├── LICENSE
-└── README.md
-```
-
-</details>
-
-<details>
-<summary><strong>Technical Specifications</strong></summary>
-
-| Area | Implementation |
-| :--- | :--- |
-| Runtime | Python 3.9+, Rich, psutil; browser edition uses Canvas and JavaScript |
-| State | In-memory application state and JSON configuration; browser game uses local storage where available |
-| Rendering | Rich terminal layouts; isolated Canvas page for browser arcade |
-| Scheduling | Dashboard refresh defaults to 0.3 seconds; terminal arcade uses 0.04-second simulation steps; browser arcade uses `requestAnimationFrame` with capped delta time |
-| Object limits | Browser game preallocates 160 projectile and 240 particle slots; excess effects are dropped |
-| Persistence | Configuration is replaced atomically; terminal and browser high scores are stored separately |
-| Validation | Standard-library `unittest` suite; build with `python -m build` after installing `build` |
-
-</details>
-
----
-
-<div align="center">
-  <sub>Built and maintained by <a href="https://github.com/NadimHider">N4D Labs</a>.</sub>
-</div>
+[MIT](LICENSE). Built and maintained by [N4D Labs](https://github.com/NadimHider).

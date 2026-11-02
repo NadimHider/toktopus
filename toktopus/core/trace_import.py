@@ -64,17 +64,22 @@ def import_otlp(path, store):
                 model = attrs.get('gen_ai.response.model') or attrs.get('gen_ai.request.model') or 'Unknown'
                 key = (str(service), str(trace_id))
                 telemetry = sessions.setdefault(key, {'session_id': str(trace_id), 'model_name': model, 'recent_steps': [], 'total_tokens': 0, 'data_status': 'imported OTLP metadata', 'current_context_available': False})
-                input_tokens = int(_number(attrs.get('gen_ai.usage.input_tokens', 0)))
-                output_tokens = int(_number(attrs.get('gen_ai.usage.output_tokens', 0)))
+                input_tokens = int(_number(attrs['gen_ai.usage.input_tokens'])) if 'gen_ai.usage.input_tokens' in attrs else None
+                output_tokens = int(_number(attrs['gen_ai.usage.output_tokens'])) if 'gen_ai.usage.output_tokens' in attrs else None
+                if model != 'Unknown':
+                    telemetry['model_name'] = model
                 # A trace can contain aggregate parents: never sum span counters into a session total.
                 telemetry['total_tokens'] = None
+                telemetry['last_modified'] = max(telemetry.get('last_modified', 0), end / 1e9)
                 telemetry['recent_steps'].append({
                     'event_id': str(span_id), 'type': str(attrs.get('gen_ai.operation.name', 'span')),
                     'status': 'ERROR' if span.get('status', {}).get('code') in (2, 'STATUS_CODE_ERROR') else 'OBSERVED',
                     'tools': [str(attrs['gen_ai.tool.name'])] if attrs.get('gen_ai.tool.name') else [],
                     'input_tokens': input_tokens, 'output_tokens': output_tokens,
-                    'total_tokens': input_tokens + output_tokens,
-                    'parent_id': str(span.get('parentSpanId', '')), 'duration_sec': (end - start) / 1e9,
+                    'total_tokens': input_tokens + output_tokens if input_tokens is not None and output_tokens is not None else None,
+                    'parent_id': str(span.get('parentSpanId', '')),
+                    'duration_sec': (end - start) / 1e9 if 'startTimeUnixNano' in span and 'endTimeUnixNano' in span else None,
+                    'timestamp': start / 1e9 if 'startTimeUnixNano' in span else None,
                 })
     # Validate the whole file before persisting any trace.
     for (service, _), telemetry in sessions.items():

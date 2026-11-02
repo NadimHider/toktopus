@@ -1,6 +1,7 @@
 """Local metadata history. Polling updates snapshots, never adds token counters."""
 import hashlib
 import json
+import math
 import os
 import sqlite3
 import time
@@ -53,21 +54,27 @@ class HistoryStore:
                   'reasoning_tokens', 'total_tokens', 'current_context_tokens',
                   'max_context_tokens', 'session_elapsed_sec', 'session_cost',
                   'is_active', 'current_context_available', 'tokens_per_sec_available')
-        snapshot = {k: telemetry[k] for k in fields if k in telemetry}
+        snapshot = {k: telemetry[k] for k in fields if k in telemetry and (telemetry[k] is None or isinstance(telemetry[k], (int, float)) and math.isfinite(telemetry[k]))}
         snapshot['data_status'] = clean_text(telemetry.get('data_status', 'locally observed'))
         snapshot['diagnostic_error'] = clean_text(telemetry.get('diagnostic_error'))
         events = []
         for step in telemetry.get('recent_steps', [])[-10000:]:
-            event = {k: step[k] for k in ('index', 'input_tokens', 'output_tokens', 'total_tokens') if k in step and isinstance(step[k], (int, float))}
+            event = {k: step[k] for k in ('index', 'input_tokens', 'output_tokens', 'total_tokens') if k in step and isinstance(step[k], (int, float)) and math.isfinite(step[k])}
             for key in ('type', 'status'):
                 event[key] = clean_text(step.get(key), 60)
             if 'parent_id' in step:
                 event['parent_id'] = clean_text(step['parent_id'], 100)
-            if 'duration_sec' in step:
+            if isinstance(step.get('duration_sec'), (int, float)) and math.isfinite(step['duration_sec']):
                 event['duration_sec'] = step['duration_sec']
-            event['tools'] = [clean_text(tool, 80) for tool in step.get('tools', [])[:20]]
+            if isinstance(step.get('timestamp'), (int, float)) and math.isfinite(step['timestamp']):
+                event['timestamp'] = step['timestamp']
+            tools = step.get('tools', [])
+            if not isinstance(tools, list):
+                tools = []
+            event['tools'] = [clean_text(tool if isinstance(tool, str) else tool['name'], 80) for tool in tools[:20] if isinstance(tool, str) or isinstance(tool, dict) and isinstance(tool.get('name'), str)]
             # Token counts/status can be corrected later: identity uses source index.
             identity = clean_text(step['event_id'], 200) if step.get('event_id') else (str(step['index']) if 'index' in step else hashlib.sha256(json.dumps(event, sort_keys=True).encode()).hexdigest())
+            event['event_id'] = identity
             events.append((identity, event))
         now = time.time()
         with closing(self._connect()) as db, db:
@@ -80,16 +87,20 @@ class HistoryStore:
             db.execute('DELETE FROM events WHERE NOT EXISTS (SELECT 1 FROM sessions s WHERE s.agent=events.agent AND s.session_id=events.session_id)')
             db.execute('DELETE FROM events WHERE rowid IN (SELECT rowid FROM events ORDER BY observed DESC LIMIT -1 OFFSET ?)', (MAX_EVENTS,))
 
-    def sessions(self, search='', limit=100):
+    def sessions(self, search='', limit=100, offset=0):
         # instr treats wildcard characters literally and parameters prevent SQL injection.
         with closing(self._connect()) as db:
-            rows = db.execute('SELECT agent, session_id, model, updated, observed, snapshot FROM sessions WHERE instr(lower(agent || session_id || model), lower(?)) > 0 ORDER BY observed DESC LIMIT ?', (search, min(max(limit, 1), MAX_SESSIONS))).fetchall()
+            rows = db.execute('SELECT agent, session_id, model, updated, observed, snapshot FROM sessions WHERE instr(lower(agent || session_id || model), lower(?)) > 0 ORDER BY CASE WHEN updated > 0 THEN updated ELSE observed END DESC, agent, session_id LIMIT ? OFFSET ?', (search, min(max(limit, 1), MAX_SESSIONS), max(0, offset))).fetchall()
         return [dict(agent=r[0], session_id=r[1], model=r[2], updated=r[3], observed=r[4], snapshot=json.loads(r[5])) for r in rows]
 
     def timeline(self, agent, session_id):
         with closing(self._connect()) as db:
             rows = db.execute('SELECT data FROM events WHERE agent=? AND session_id=? ORDER BY observed, rowid', (agent, session_id)).fetchall()
-        return [json.loads(row[0]) for row in rows]
+        events = [json.loads(row[0]) for row in rows]
+        # Imported/native timestamps establish chronology when every event has one.
+        if events and all('timestamp' in event for event in events):
+            events.sort(key=lambda event: (event['timestamp'], event.get('index', 0)))
+        return events
 
 
 def findings(events):

@@ -360,10 +360,14 @@ def main():
     parser.add_argument("--diagnostics", action="store_true", help="Show local telemetry source diagnostics")
     parser.add_argument("--history", action="store_true", help="Show locally recorded session history")
     parser.add_argument("--search", default="", help="Filter history by agent, session ID or model")
+    parser.add_argument("--limit", type=int, default=100, help="Maximum history rows or timeline events to display (1-2000)")
+    parser.add_argument("--offset", type=int, default=0, help="Skip history rows or newest timeline events")
     parser.add_argument("--timeline", metavar="SESSION_ID", help="Show recorded events for a session; use --agent")
     parser.add_argument("--no-history", action="store_true", help="Disable local history recording")
     parser.add_argument("--import-otlp", metavar="FILE", help="Import local OTLP JSON span metadata without uploading")
     args = parser.parse_args()
+    if not 1 <= args.limit <= 2000 or args.offset < 0:
+        parser.error('--limit must be between 1 and 2000; --offset must be non-negative')
     if args.agent not in {"antigravity", "claude", "opencode", "cursor", "codex", "pi", "auto"} and not (args.timeline and args.agent.startswith('otel:')):
         parser.error("Unknown agent; use antigravity, claude, opencode, cursor, codex, pi or auto (otel:service is accepted for --timeline)")
 
@@ -382,14 +386,14 @@ def main():
             store = HistoryStore()
             if args.import_otlp:
                 console.print(f"Imported {import_otlp(args.import_otlp, store)} spans locally.")
+            if args.timeline:
+                if args.agent == "auto":
+                    parser.error("--timeline requires an explicit --agent")
+                console.print(render_timeline(store, args.agent, args.timeline, limit=args.limit, offset=args.offset))
+            else:
+                console.print(render_history(store, args.search, limit=args.limit, offset=args.offset))
         except (OSError, sqlite3.Error, ValueError, TypeError, KeyError) as exc:
             parser.error(f"Local history/import failed ({type(exc).__name__}): check the file and storage permissions")
-        if args.timeline:
-            if args.agent == "auto":
-                parser.error("--timeline requires an explicit --agent")
-            console.print(render_timeline(store, args.agent, args.timeline))
-        else:
-            console.print(render_history(store, args.search))
         return
 
     if args.web_game:
@@ -522,6 +526,8 @@ def main():
     last_discovery = -5.0
     selected_history = 0
     timeline_selection = None
+    history_offset = 0
+    timeline_offset = 0
     try:
         with Live(console=console, screen=True, auto_refresh=False) as live:
             last_refresh = 0.0
@@ -532,14 +538,32 @@ def main():
                 key = get_pressed_key()
                 if key == "q":
                     break
+                elif current_view in ('history', 'timeline') and key in ('n', 'p') and history_store and not history_error:
+                    try:
+                        if current_view == 'history':
+                            candidate = max(0, history_offset + (6 if key == 'n' else -6))
+                            if history_store.sessions(limit=6, offset=candidate):
+                                history_offset = candidate
+                                selected_history = 0
+                        else:
+                            count = len(history_store.timeline(*timeline_selection))
+                            timeline_offset = max(0, min(max(0, ((count - 1) // 6) * 6), timeline_offset + (6 if key == 'n' else -6)))
+                    except (OSError, sqlite3.Error, ValueError) as exc:
+                        history_error = f'Local history unavailable ({type(exc).__name__})'
+                    last_refresh = 0.0
                 elif current_view == 'history' and key in ('[', ']'):
                     selected_history = max(0, min(5, selected_history + (1 if key == ']' else -1)))
                     last_refresh = 0.0
                 elif current_view == 'history' and key in ('\r', '\n') and history_store and not history_error:
-                    rows = history_store.sessions(limit=6)
+                    try:
+                        rows = history_store.sessions(limit=6, offset=history_offset)
+                    except (OSError, sqlite3.Error, ValueError) as exc:
+                        rows = []
+                        history_error = f'Local history unavailable ({type(exc).__name__})'
                     if rows:
                         row = rows[min(selected_history, len(rows) - 1)]
                         timeline_selection = (row['agent'], row['session_id'])
+                        timeline_offset = 0
                         current_view = 'timeline'
                     last_refresh = 0.0
                 elif key in KEY_MAP:
@@ -637,9 +661,17 @@ def main():
                     elif current_view == "health":
                         dashboard = render_model_health(health_snapshot, compact=True)
                     elif current_view == "history":
-                        dashboard = render_history(history_store, limit=6, selected=selected_history) if history_store and not history_error else (history_error or "History disabled (--no-history). J returns to Overview.")
+                        try:
+                            dashboard = render_history(history_store, limit=6, selected=selected_history, offset=history_offset) if history_store and not history_error else (history_error or "History disabled (--no-history). J returns to Overview.")
+                        except (OSError, sqlite3.Error, ValueError) as exc:
+                            history_error = f'Local history unavailable ({type(exc).__name__})'
+                            dashboard = history_error
                     elif current_view == 'timeline' and timeline_selection:
-                        dashboard = render_timeline(history_store, *timeline_selection, limit=6)
+                        try:
+                            dashboard = render_timeline(history_store, *timeline_selection, limit=6, offset=timeline_offset, compact=True) if not history_error else history_error
+                        except (OSError, sqlite3.Error, ValueError) as exc:
+                            history_error = f'Local history unavailable ({type(exc).__name__})'
+                            dashboard = history_error
                     live.update(dashboard, refresh=True)
                     last_refresh = now
 
