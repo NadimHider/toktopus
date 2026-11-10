@@ -80,11 +80,11 @@ Antigravity, Claude Code, OpenCode, Cursor, Codex, and legacy Pi records are sup
 </tr>
 </table>
 
-### New in v1.7.0
+### New in v1.8.0
 
-Local history, selectable tool timelines, OTLP JSON imports, LiveNerf Model Health, corrected Codex accounting, and support for OpenCode's session/message/part database schema.
+Live BenchLM REST API integration for real-time coding benchmark rankings and token pricing, surface selection (`coding`, `agentic`, `reasoning`, `overall`), atomic local caching, and offline fallback.
 
-[Read the release notes](docs/releases/v1.7.0.md) · [Explore the full user guide](docs/USAGE.md) · [See the research and roadmap](docs/OBSERVABILITY-RESEARCH.md)
+[Read the release notes](docs/releases/v1.8.0.md) · [Explore the full user guide](docs/USAGE.md) · [See the research and roadmap](docs/OBSERVABILITY-RESEARCH.md)
 
 ## Quick Start
 
@@ -111,10 +111,10 @@ python -m unittest discover -s tests
 <details>
 <summary><strong>Install the release, update a checkout, or use a downloaded wheel</strong></summary>
 
-Install v1.7.0 directly from GitHub with Git available:
+Install v1.8.0 directly from GitHub with Git available:
 
 ```bash
-python -m pip install --upgrade "git+https://github.com/NadimHider/toktopus.git@v1.7.0"
+python -m pip install --upgrade "git+https://github.com/NadimHider/toktopus.git@v1.8.0"
 python -m toktopus
 ```
 
@@ -270,7 +270,7 @@ Launch with `python -m toktopus --web-game`, or use <kbd>G</kbd> for the termina
 | Scheduling | Dashboard rendering: 0.3 seconds; selected-agent cache: 2 seconds; history discovery: 5 seconds; terminal game: 0.04-second steps |
 | Object limits | Browser game preallocates 160 projectile and 240 particle slots; excess effects are dropped |
 | Persistence | Atomic configuration/cache writes, bounded local history, and separate terminal/browser high scores |
-| Validation | 111 tests at v1.7.0 release; Ruff lint, distribution builds, and cross-platform GitHub CI |
+| Validation | 118 tests at v1.8.0 release; Ruff lint, distribution builds, and cross-platform GitHub CI |
 
 </details>
 

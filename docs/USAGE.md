@@ -6,14 +6,14 @@
 
 Requires Python 3.9 or newer. Use an interactive terminal for the live dashboard.
 
-Install the v1.7.0 release directly from GitHub:
+Install the v1.8.0 release directly from GitHub:
 
 ```bash
-python -m pip install --upgrade "git+https://github.com/NadimHider/toktopus.git@v1.7.0"
+python -m pip install --upgrade "git+https://github.com/NadimHider/toktopus.git@v1.8.0"
 python -m toktopus
 ```
 
-This installation method requires Git. You can also install the wheel attached to the [release](https://github.com/NadimHider/toktopus/releases/tag/v1.7.0) with `python -m pip install --upgrade PATH_TO_WHEEL`.
+This installation method requires Git. You can also install the wheel attached to the [release](https://github.com/NadimHider/toktopus/releases/tag/v1.8.0) with `python -m pip install --upgrade PATH_TO_WHEEL`.
 
 The `toktopus` command is available when Python's scripts directory is on your PATH. Otherwise, use `python -m toktopus`, which runs the same application.
 
@@ -33,16 +33,15 @@ git pull --ff-only
 python -m pip install --upgrade .
 ```
 
-## What is new in v1.7.0
+## What is new in v1.8.0
 
-- Local SQLite session history with metadata search and paging.
-- Selectable tool timelines with observed status, available timestamps, failure counts, and repeated-activity hints.
-- Automatic history collection from detected local agents every five seconds. Selected-agent telemetry is cached for two seconds.
-- Local OTLP JSON imports with trace, span, parent, duration, and available token metadata.
-- LiveNerf Model Health with explicit refresh, a validated local cache, source provenance, and offline fallback.
-- Diagnostics for missing sources and unsupported database schemas.
-- Corrected Codex token accounting, an OpenCode session/message/part reader, and removal of fabricated activity and token speeds.
-- Unavailable account quotas are shown explicitly. Estimated costs are separated from actual billing.
+- Live BenchLM REST API integration for real-time model benchmark rankings and pricing.
+- Specialized ranking surfaces: `--surface {coding,agentic,reasoning,overall}`.
+- Atomic local caching (`~/.config/toktopus/benchlm.json` and `benchlm_{surface}.json`) with 24-hour freshness TTL.
+- Offline resilience preserving valid cached data without blocking or failing on offline startup.
+- Configurable BenchLM API key via environment variable, `config.json`, or `--benchlm-key`.
+- Explicit `--refresh-benchmarks` CLI command.
+- Live source provenance in terminal dashboard overlay and CLI table.
 
 Read the [release notes](releases/v1.7.0.md) for compatibility details.
 
