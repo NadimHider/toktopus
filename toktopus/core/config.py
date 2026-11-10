@@ -14,6 +14,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "pricing_model": "gemini-3.8-flash",
     "refresh_rate": 0.3,
     "show_benchmarks": False,
+    "benchlm_api_key": "",
 }
 
 
@@ -69,3 +70,12 @@ def get_default_plan_for_agent(agent_key: str) -> str:
         "pi": "pi-pro",
     }
     return defaults.get(agent_key, "google-ai-pro")
+
+
+def get_benchlm_api_key() -> str:
+    env_key = os.getenv("BENCHLM_API_KEY") or os.getenv("BENCHLM_DATA_KEY")
+    if env_key:
+        return env_key.strip()
+    cfg = load_config()
+    return str(cfg.get("benchlm_api_key") or "").strip()
+

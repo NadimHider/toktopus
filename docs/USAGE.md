@@ -149,11 +149,14 @@ Use `--no-history` to disable recording and automatic background discovery for t
 
 ## Other tools
 
-The app also includes a skill vault, bundled benchmark table, companion lounge, terminal Space Impact game, and a standalone browser game. The bundled benchmark table is separate from LiveNerf and should not be treated as a live capability measurement.
+The app includes a skill vault, live BenchLM benchmark rankings, companion lounge, terminal Space Impact game, and a standalone browser game. Benchmarking data can be queried directly from the BenchLM REST API (`data.benchlm.ai`), cached locally in `~/.config/toktopus/benchlm.json`, or viewed offline with bundled fallback data.
 
 ```bash
 python -m toktopus --skills
 python -m toktopus --benchmarks
+python -m toktopus --refresh-benchmarks
+python -m toktopus --benchmarks --surface agentic
+python -m toktopus --benchlm-key YOUR_API_KEY
 python -m toktopus --pet
 python -m toktopus --game
 python -m toktopus --web-game

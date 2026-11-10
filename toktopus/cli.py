@@ -21,9 +21,19 @@ if hasattr(sys.stdout, "reconfigure"):
 
 from toktopus import __version__
 from toktopus.adapters import KEY_MAP, auto_detect_active_agent, get_adapter
-from toktopus.core.benchmarks import get_benchmarks, get_benchmarks_last_updated
+from toktopus.core.benchmarks import (
+    get_benchmarks,
+    get_benchmarks_last_updated,
+    get_benchmarks_source,
+    refresh_benchmarks_online,
+)
 from toktopus.core.collector import LocalCollector
-from toktopus.core.config import load_config, save_config
+from toktopus.core.config import (
+    CONFIG_FILE,
+    get_benchlm_api_key,
+    load_config,
+    save_config,
+)
 from toktopus.core.diagnostics import render_diagnostics
 from toktopus.core.history import HistoryStore
 from toktopus.core.keyboard import get_pressed_key, init_keyboard, restore_keyboard
@@ -114,11 +124,16 @@ def interactive_edit_skill(active_agent_key: str):
         console.print(f"[bold #ff3366]Error: Failed to modify skill '{skill_info['name']}'.[/bold #ff3366]")
     time.sleep(1.5)
 
-def print_benchmarks_table():
+def print_benchmarks_table(surface: str = "coding"):
     from toktopus.ui.charts import relative_benchmark_bar
 
+    models = get_benchmarks(surface=surface)
     updated_date = get_benchmarks_last_updated()
-    table = Table(title=f":: TOKTOPUS : AI Coding Model Benchmark Index (Weekly Verified : {updated_date}) ::", border_style="#ffe600")
+    source = get_benchmarks_source()
+    table = Table(
+        title=f":: TOKTOPUS : AI Coding Model Benchmark Index ({source} · As of: {updated_date}) ::",
+        border_style="#ffe600",
+    )
     table.add_column("Rank", justify="center", style="dim")
     table.add_column("Model Name", style="bold white")
     table.add_column("Provider", style="#b026ff")
@@ -129,7 +144,13 @@ def print_benchmarks_table():
     table.add_column("Price (In/Out 1M)", justify="right", style="dim")
     table.add_column("Relative Rating", style="#00f3ff")
 
-    for m in get_benchmarks():
+    models = get_benchmarks(surface=surface)
+    for m in models:
+        speed_str = f"{m['throughput_tps']} tok/s" if m.get("throughput_tps") else "N/A"
+        price_in = m.get("price_in", 0.0)
+        price_out = m.get("price_out", 0.0)
+        price_str = f"${price_in:.2f} / ${price_out:.2f}" if (price_in > 0 or price_out > 0) else "N/A"
+
         table.add_row(
             f"#{m['rank']}",
             m["name"],
@@ -137,9 +158,9 @@ def print_benchmarks_table():
             str(m["coding_elo"]),
             f"{m['swe_bench']:.1f}%",
             f"{m['humaneval']:.1f}%",
-            f"{m['throughput_tps']} tok/s",
-            f"${m['price_in']:.2f} / ${m['price_out']:.2f}",
-            relative_benchmark_bar(m["coding_elo"])
+            speed_str,
+            price_str,
+            relative_benchmark_bar(m["coding_elo"]),
         )
 
     console.print(table)
@@ -286,6 +307,22 @@ def main():
         help="Display AI Model Benchmark Index and exit"
     )
     parser.add_argument(
+        "--refresh-benchmarks",
+        action="store_true",
+        help="Fetch latest model benchmark rankings from BenchLM REST API and update cache"
+    )
+    parser.add_argument(
+        "--benchlm-key",
+        metavar="KEY",
+        help="Set BenchLM API key, save to configuration, and use for live benchmarks"
+    )
+    parser.add_argument(
+        "--surface",
+        default="coding",
+        choices=["coding", "agentic", "reasoning", "overall"],
+        help="BenchLM ranking surface to display (default: coding)"
+    )
+    parser.add_argument(
         "--game", "--space-impact",
         dest="run_game",
         action="store_true",
@@ -410,8 +447,30 @@ def main():
         run_pet_lounge()
         sys.exit(0)
 
+    if args.benchlm_key:
+        save_config({"benchlm_api_key": args.benchlm_key.strip()})
+        console.print(f"[bold #00ff88]:: Saved BenchLM API key to {CONFIG_FILE} ::[/bold #00ff88]")
+
+    if args.refresh_benchmarks:
+        console.print("[dim]:: Querying latest rankings from BenchLM REST API...[/dim]")
+        key = args.benchlm_key or get_benchlm_api_key()
+        if not key:
+            console.print("[bold #ff3366]Error: BenchLM API key is not configured. Set BENCHLM_API_KEY environment variable or pass --benchlm-key <KEY>.[/bold #ff3366]")
+            sys.exit(1)
+        ok = refresh_benchmarks_online(surface=args.surface, api_key=key)
+        if ok:
+            source = get_benchmarks_source()
+            date_str = get_benchmarks_last_updated()
+            count = len(get_benchmarks(surface=args.surface))
+            console.print(f"[bold #00ff88]:: Successfully refreshed {count} models from {source} (As of {date_str}) ::[/bold #00ff88]\n")
+            print_benchmarks_table(surface=args.surface)
+        else:
+            console.print("[bold #ff3366]Warning: Failed to refresh benchmarks from BenchLM. Showing cached or fallback data.[/bold #ff3366]\n")
+            print_benchmarks_table(surface=args.surface)
+        sys.exit(0)
+
     if args.benchmarks:
-        print_benchmarks_table()
+        print_benchmarks_table(surface=args.surface)
         sys.exit(0)
 
     if args.list_skills:

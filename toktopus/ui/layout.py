@@ -7,7 +7,11 @@ from rich.table import Table
 from rich.text import Text
 
 from toktopus import __version__
-from toktopus.core.benchmarks import get_benchmarks, get_benchmarks_last_updated
+from toktopus.core.benchmarks import (
+    get_benchmarks,
+    get_benchmarks_last_updated,
+    get_benchmarks_source,
+)
 from toktopus.core.limits import estimate_account_limits
 from toktopus.core.pet import get_cyber_pet
 from toktopus.core.pricing import calculate_costs, resolve_pricing_model
@@ -387,20 +391,26 @@ def build_dashboard(
             prefix = ">> " if is_cur else "   "
             name_style = "bold #00ff88" if is_cur else "white"
 
+            speed_str = f"{b['throughput_tps']} tok/s" if b.get("throughput_tps") else "N/A"
+            price_in = b.get("price_in", 0.0)
+            price_out = b.get("price_out", 0.0)
+            price_str = f"${price_in:.2f} / ${price_out:.2f}" if (price_in > 0 or price_out > 0) else "N/A"
+
             bench_table.add_row(
                 f"{prefix}{b['name']}",
                 str(b["coding_elo"]),
                 f"{b['humaneval']:.1f}%",
                 f"{b['swe_bench']:.1f}%",
-                f"{b['throughput_tps']} tok/s",
-                f"${b['price_in']:.2f} / ${b['price_out']:.2f}",
+                speed_str,
+                price_str,
                 relative_benchmark_bar(b["coding_elo"]),
                 style=name_style if is_cur else None
             )
 
         last_updated_str = get_benchmarks_last_updated()
+        source_str = get_benchmarks_source()
         layout["lower_row"].update(
-            Panel(bench_table, title=f"[bold #ffe600][LIVE AI BENCHMARK INDEX][/bold #ffe600] [dim](Weekly Verified : {last_updated_str})[/dim]", border_style="#ffe600", box=box.ROUNDED)
+            Panel(bench_table, title=f"[bold #ffe600][AI BENCHMARK INDEX · {source_str}][/bold #ffe600] [dim](As of: {last_updated_str})[/dim]", border_style="#ffe600", box=box.ROUNDED)
         )
     else:
         subagents = telemetry.get("active_subagents", [])

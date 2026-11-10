@@ -157,7 +157,7 @@ See the [user guide](docs/USAGE.md) for full source coverage, privacy details, s
 
 </details>
 
-## Model Health
+## Model Health & Benchmarks
 
 Follow public [LiveNerf](https://github.com/ninjahawk/livenerf) observations without running a benchmark yourself. Press <kbd>H</kbd> for the cached terminal view.
 
@@ -165,6 +165,17 @@ Follow public [LiveNerf](https://github.com/ninjahawk/livenerf) observations wit
 python -m toktopus --refresh-model-health
 python -m toktopus --model-health
 ```
+
+Access verified AI coding model rankings and pricing from the [BenchLM](https://benchlm.ai) REST API. Press <kbd>B</kbd> in the dashboard or run the CLI commands:
+
+```bash
+python -m toktopus --benchmarks
+python -m toktopus --refresh-benchmarks
+python -m toktopus --benchmarks --surface agentic
+python -m toktopus --benchlm-key YOUR_API_KEY
+```
+
+Rankings are cached locally in `~/.config/toktopus/benchlm.json` with automatic offline fallback, 24-hour freshness tracking, and multiple surface options (`coding`, `agentic`, `reasoning`, `overall`).
 
 Refresh downloads public data only when requested. Cached viewing works offline, failed refreshes preserve the last valid copy, and retrievals older than 48 hours are marked stale. The full command-line view includes benchmark-family detail and provenance. Toktopus does not infer a statistical degradation verdict from a daily score.
 
