@@ -298,7 +298,10 @@ def load_benchmarks(
     timeout_sec: float = 6.0,
 ) -> Dict[str, Any]:
     global _LIVE_CACHE, _CURRENT_UPDATED_DATE, _CURRENT_SOURCE, _CURRENT_SURFACE
-    path = Path(cache_path) if cache_path is not None else BENCHLM_CACHE_FILE
+    if cache_path is not None:
+        path = Path(cache_path)
+    else:
+        path = CONFIG_DIR / f"benchlm_{surface}.json" if surface != "coding" else BENCHLM_CACHE_FILE
     effective_key = api_key or get_benchlm_api_key()
 
     snapshot: Dict[str, Any] = {
@@ -449,8 +452,8 @@ def reset_benchmarks_cache() -> None:
 
 
 def get_benchmarks(surface: str = "coding") -> List[Dict[str, Any]]:
-    global _LIVE_CACHE
-    if _LIVE_CACHE is not None:
+    global _LIVE_CACHE, _CURRENT_SURFACE
+    if _LIVE_CACHE is not None and _CURRENT_SURFACE == surface:
         return _LIVE_CACHE
     snapshot = load_benchmarks(refresh=False, surface=surface)
     return snapshot.get("models", BENCHMARK_MATRIX)
